@@ -1,5 +1,4 @@
 using System;
-using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -11,7 +10,6 @@ using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Helpers;
 using ExileCore.Shared.Interfaces;
 using JM.LinqFaster;
-using Microsoft.CodeDom.Providers.DotNetCompilerPlatform;
 using MoreLinq.Extensions;
 using SharpDX;
 
@@ -175,131 +173,39 @@ namespace ExileCore.Shared
         }
 
 
-        private Assembly CompilePlugin(DirectoryInfo info, CodeDomProvider provider, string[] dllFiles)
+        private Assembly CompilePlugin(DirectoryInfo info, string[] dllFiles)
         {
             var csFiles = info.GetFiles("*.cs", SearchOption.AllDirectories).Select(x => x.FullName)
                 .ToArray();
 
-            var parameters = new CompilerParameters
-            {
-                GenerateExecutable = false, GenerateInMemory = true,
-                CompilerOptions = "/optimize /unsafe"
-            };
-
-            parameters.ReferencedAssemblies.AddRange(dllFiles);
-            var csprojPath = Path.Combine(info.FullName, $"{info.Name}.csproj");
-
-            if (File.Exists(csprojPath))
-            {
-                var readAllLines = File.ReadAllLines(csprojPath);
-
-                var refer = readAllLines
-                    .WhereF(x =>
-                        x.TrimStart().StartsWith("<Reference Include=") && x.TrimEnd().EndsWith("/>"));
-
-                var refer2 = readAllLines.Where(x =>
-                    x.TrimStart().StartsWith("<Reference Include=") && x.TrimEnd().EndsWith("\">") &&
-                    x.Contains(","));
-
-                foreach (var r in refer)
-                {
-                    var arr = new int[2] {0, 0};
-                    var j = 0;
-
-                    for (var i = 0; i < r.Length; i++)
-                        if (r[i] == '"')
-                        {
-                            arr[j] = i;
-                            j++;
-                        }
-
-                    if (arr[1] != 0)
-                    {
-                        var dll = $"{r.Substring(arr[0] + 1, arr[1] - arr[0] - 1)}.dll";
-                        parameters.ReferencedAssemblies.Add(dll);
-                    }
-                }
-
-                foreach (var r in refer2)
-                {
-                    var arr = new int[2] {0, 0};
-                    var j = 0;
-
-                    for (var i = 0; i < r.Length; i++)
-                    {
-                        if (r[i] == '"' && j == 0)
-                        {
-                            arr[0] = i;
-                            j++;
-                        }
-                        else if (r[i] == ',')
-                        {
-                            arr[1] = i;
-                            j++;
-                        }
-
-                        if (j == 2)
-                            break;
-                    }
-
-                    if (arr[1] != 0)
-                    {
-                        var dll = $"{r.Substring(arr[0] + 1, arr[1] - arr[0] - 1)}.dll";
-                        parameters.ReferencedAssemblies.Add(dll);
-                    }
-                }
-            }
+            var references = new List<string>(dllFiles);
 
             var libsFolder = Path.Combine(info.FullName, "libs");
-
             if (Directory.Exists(libsFolder))
+                references.AddRange(Directory.GetFiles(libsFolder, "*.dll"));
+
+            var result = RoslynCompiler.Compile(info.Name, csFiles, references);
+
+            if (!result.Success)
             {
-                var libsDll = Directory.GetFiles(libsFolder, "*.dll");
-                parameters.ReferencedAssemblies.AddRange(libsDll);
+                foreach (var error in result.Errors)
+                    Logger.Log.Error($"{info.Name} -> {error}");
+
+                File.WriteAllText(Path.Combine(info.FullName, "Errors.txt"),
+                    string.Join(Environment.NewLine, result.Errors));
+
+                return null;
             }
 
-            //   parameters.TempFiles = new TempFileCollection($"{MainDir}\\{PluginsDirectory}\\Temp");
-            //  parameters.CoreAssemblyFileName = info.Name;
-            var result = provider.CompileAssemblyFromFile(parameters, csFiles);
-
-            if (result.Errors.HasErrors)
-            {
-                var AllErrors = "";
-
-                foreach (CompilerError compilerError in result.Errors)
-                {
-                    AllErrors += compilerError + Environment.NewLine;
-                    Logger.Log.Error($"{info.Name} -> {compilerError}");
-                }
-
-                File.WriteAllText(Path.Combine(info.FullName, "Errors.txt"), AllErrors);
-
-                // throw new Exception("Offsets file corrupted");
-            }
-            else
-            {
-                return result.CompiledAssembly;
-            }
-
-            return null;
+            return result.Pdb != null
+                ? Assembly.Load(result.Dll, result.Pdb)
+                : Assembly.Load(result.Dll);
         }
-        
+
         private List<(Assembly CompiledAssembly, DirectoryInfo directoryInfoinfo)> CompilePluginsFromSource(DirectoryInfo[] sourcePlugins)
         {
-            using (CodeDomProvider provider =
-                new CSharpCodeProvider())
             using (new PerformanceTimer("Compile and load source plugins"))
             {
-                var _compilerSettings = provider.GetType()
-                    .GetField("_compilerSettings", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .GetValue(provider);
-
-                var _compilerFullPath = _compilerSettings
-                    .GetType().GetField("_compilerFullPath", BindingFlags.Instance | BindingFlags.NonPublic);
-
-                _compilerFullPath.SetValue(_compilerSettings,
-                    ((string) _compilerFullPath.GetValue(_compilerSettings)).Replace(@"bin\roslyn\", @"roslyn\"));
-
                 var rootDirInfo = new DirectoryInfo(RootDirectory);
 
                 var dllFiles = rootDirInfo.GetFiles("*.dll", SearchOption.TopDirectoryOnly)
@@ -308,39 +214,23 @@ namespace ExileCore.Shared
 
                 var results = new List<(Assembly CompiledAssembly, DirectoryInfo info)>(sourcePlugins.Length);
 
-                if (parallelLoading)
+                void CompileAndLoad(DirectoryInfo info)
                 {
-                    var innerLocker = new object();
-              
-
-                    Parallel.ForEach(sourcePlugins, info =>
+                    using (new PerformanceTimer($"Compile and load source plugin: {info.Name}"))
                     {
-                        using (new PerformanceTimer($"Compile and load source plugin: {info.Name}"))
-                        {
-                            /*lock (innerLocker)
-                            {
-                                results.Add((CompilePlugin(info,provider,dllFiles),info));
-                            }*/
-                            (Assembly ass, DirectoryInfo info) valueTuple = (CompilePlugin(info,provider,dllFiles),info);
-                            if (valueTuple.ass != null)
-                            {
-                                TryLoadPlugin(valueTuple);
-                            }
-                        }
-                    });
-                }
-                else
-                {
-                    foreach (var info in sourcePlugins)
-                    {
-                        /*results.Add((CompilePlugin(info,provider,dllFiles),info));*/
-                        (Assembly ass, DirectoryInfo info) valueTuple = (CompilePlugin(info,provider,dllFiles),info);
+                        (Assembly ass, DirectoryInfo info) valueTuple = (CompilePlugin(info, dllFiles), info);
                         if (valueTuple.ass != null)
                         {
                             TryLoadPlugin(valueTuple);
                         }
                     }
                 }
+
+                if (parallelLoading)
+                    Parallel.ForEach(sourcePlugins, CompileAndLoad);
+                else
+                    foreach (var info in sourcePlugins)
+                        CompileAndLoad(info);
 
                 return results;
             }

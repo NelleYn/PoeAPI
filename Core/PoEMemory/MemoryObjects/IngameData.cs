@@ -37,6 +37,7 @@ namespace ExileCore.PoEMemory.MemoryObjects
         public int CurrentAreaLevel => _cacheStruct.Value.CurrentAreaLevel;
         public uint CurrentAreaHash => _cacheStruct.Value.CurrentAreaHash;
         public Entity LocalPlayer => _localPlayer.Value;
+        public TerrainData Terrain => _cacheStruct.Value.Terrain;
         public long EntiteisTest => DataStruct.EntityList;
         public EntityList EntityList => _EntityList ?? (_EntityList = GetObject<EntityList>(DataStruct.EntityList));
         private long LabDataPtr => _cacheStruct.Value.LabDataPtr;

@@ -14,5 +14,7 @@ namespace GameOffsets
         [FieldOffset(0x11C)] public long LabDataPtr;
         [FieldOffset(0x490)] public long EntityList;
         [FieldOffset(0x498)] public long EntitiesCount;
+        // VERIFY against your ExileApi-Compiled reference for the current PoE build.
+        [FieldOffset(0x748)] public TerrainData Terrain;
     }
 }

@@ -16,25 +16,36 @@ Difference with main fork:
 * All "standard" plugins cut. (Now they should be like another plugins)
 
 # Requirements:
-* .NET 4.8 installed https://dotnet.microsoft.com/download/thank-you/net48
+* .NET 10 Desktop Runtime (x64) — https://dotnet.microsoft.com/download/dotnet/10.0
 
 # For developers:
 
+This fork targets **net10.0-windows** with SDK-style projects (`Core`, `GameOffsets`,
+`Loader`). All NuGet dependencies are restored via `PackageReference`; there is no
+`packages.config` and no Fody. Source plugins are compiled at runtime with the **Roslyn**
+APIs (`Microsoft.CodeAnalysis.CSharp`) rather than the legacy CodeDom provider.
+
 Build requirements:
-* Visual Studio 2019 (with 2017 could be a problems, at least need packages downgrade).
-* .NET 4.8 Developer Pack should be installed https://dotnet.microsoft.com/download/thank-you/net48-developer-pack (don't click on languages/packages at the bottom of page, this is language packages, not the main .NET 4.8 DevPack!).
+* .NET 10 SDK (x64) and a Windows machine with ExileApi assets.
+* SharpDX 4.2 (NuGet) + `ImGui.NET.dll` / `cimgui.dll` (shipped in `deps/`). If you run a
+  different ExileApi-Compiled build, swap those two binaries for the matching version.
 
 Compilation:
-* Create a new folder (HUD for example)
-* Download release version from current repo, put to HUD directory (HUD\PoeHelper)
-* Clone the this repo code to HUD folder (HUD\ExileApi)
-* Open&Build ExileApi\ExileApi.sln solution.
-* Program will be automatically copied to PoeHelper directory.
+* Create a HUD folder, clone this repo into it (e.g. `HUD\ExileApi`).
+* `dotnet build -c Release ExileApi.sln` (or build `Loader/Loader.csproj`).
+* Output (`ExileCore.dll`, `GameOffsets.dll`, `Loader.exe`, `cimgui.dll`, textures) is copied
+  to `..\PoeHelper\`. Run `Loader.exe` from there.
 
-Known build errors:
-* (check project references) References error in some project: unload then load project to solution (right mouse button on project in solution).
-* Error with MsBuildMajorVersion: Update your VS2019 (maybe you have VS 2019 Preview or something)
-* MsBuild 15 < 16 error: expecting VS 2019 installed. On VS 2017 try downgrade Fody package to version 4.2.1.
+Building plugins against this fork:
+* Point a consumer plugin's `ExileApiDir` at the `PoeHelper` output, e.g.
+  `dotnet build -c Release -p:ExileApiDir=C:\HUD\PoeHelper`. The plugin resolves
+  `ExileCore.dll` / `GameOffsets.dll` / `SharpDX*.dll` from there and drops its compiled DLL
+  into `PoeHelper\Plugins\Compiled\<name>\`.
+
+Notes:
+* Memory offsets (`GameOffsets`) are tied to the current PoE build. `IngameData.Terrain` is
+  wired up, but the `TerrainData` position inside `IngameDataOffsets` must be verified against
+  your reference for the patch you run (see the note in `GameOffsets/TerrainData.cs`).
 
 ## Troubleshooting
 
