@@ -1,17 +1,24 @@
 ﻿using SharpDX;
 
-namespace ExileCore.PoEMemory.Elements.InventoryElements
-{
-    public class DelveInventoryItem : NormalInventoryItem
-    {
-        // Inventory Position in Delve Stash is always invalid.
-        // Also, as items are fixed, so Inventory Position doesn't matter.
-        public override int InventPosX => 0;
-        public override int InventPosY => 0;
+namespace ExileCore.PoEMemory.Elements.InventoryElements;
 
-        public override RectangleF GetClientRect()
-        {
-            return Parent.GetClientRect();
-        }
+/// <summary>
+/// Inventory item wrapper for the Delve stash tab, where item positions are fixed and inventory coordinates are ignored.
+/// </summary>
+public class DelveInventoryItem : NormalInventoryItem
+{
+    // Inventory Position in Delve Stash is always invalid.
+    // Also, as items are fixed, so Inventory Position doesn't matter.
+
+    /// <inheritdoc />
+    public override int InventPosX => 0;
+
+    /// <inheritdoc />
+    public override int InventPosY => 0;
+
+    /// <inheritdoc />
+    public override RectangleF GetClientRect()
+    {
+        return Parent.GetClientRect();
     }
 }

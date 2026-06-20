@@ -1,46 +1,55 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ExileCore.PoEMemory.Elements
+namespace ExileCore.PoEMemory.Elements;
+
+/// <summary>
+/// UI element for the map stash tab, exposing map counts and the currently selected cell by reading the UI tree.
+/// </summary>
+public class MapStashTabElementQ : Element
 {
-    public class MapStashTabElementQ : Element
+    /// <summary>
+    /// Gets map names mapped to their displayed counts.
+    /// </summary>
+    public Dictionary<string, string> MapsCount => GetMapsCount();
+
+    /// <summary>
+    /// Gets the contents of the currently selected cell, keyed by item name.
+    /// </summary>
+    public Dictionary<string, string> CurrentCell => GetCurrentCell();
+
+    private Dictionary<string, string> GetCurrentCell()
     {
-        public Dictionary<string, string> MapsCount => GetMapsCount();
-        public Dictionary<string, string> CurrentCell => GetCurrentCell();
+        var cell = Children[2].Children[0].Children[0].Children;
+        var result = new Dictionary<string, string>();
 
-        private Dictionary<string, string> GetCurrentCell()
+        foreach (var element in cell)
         {
-            var cell = Children[2].Children[0].Children[0].Children;
-            var result = new Dictionary<string, string>();
+            var name = element?.Tooltip?.Children?[0].Children[0].Children[3].Text;
 
-            foreach (var element in cell)
+            if (name == null)
             {
-                var name = element?.Tooltip?.Children?[0].Children[0].Children[3].Text;
-
-                if (name == null)
-                {
-                    var tooltipText = element.Tooltip?.Text;
-                    name = tooltipText != null ? tooltipText.Substring(0, tooltipText.IndexOf('\n')) : "Error";
-                }
-
-                var count = element.Children[4].Text;
-                result.Add(name, count);
+                var tooltipText = element.Tooltip?.Text;
+                name = tooltipText != null ? tooltipText.Substring(0, tooltipText.IndexOf('\n')) : "Error";
             }
 
-            return result;
+            var count = element.Children[4].Text;
+            result.Add(name, count);
         }
 
-        private Dictionary<string, string> GetMapsCount()
+        return result;
+    }
+
+    private Dictionary<string, string> GetMapsCount()
+    {
+        var Rows = Children[0].Children.Concat(Children[1].Children);
+        var result = new Dictionary<string, string>();
+
+        foreach (var element in Rows)
         {
-            var Rows = Children[0].Children.Concat(Children[1].Children);
-            var result = new Dictionary<string, string>();
-
-            foreach (var element in Rows)
-            {
-                result.Add(element.Children[0].Text, element.Children[1].Text);
-            }
-
-            return result;
+            result.Add(element.Children[0].Text, element.Children[1].Text);
         }
+
+        return result;
     }
 }
