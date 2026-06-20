@@ -14,6 +14,10 @@ using Vector2 = System.Numerics.Vector2;
 
 namespace ExileCore;
 
+/// <summary>
+/// The main HUD settings window. Renders the core/theme/plugin settings menu and the performance
+/// debug window (coroutines, caches and per-plugin timing) via ImGui, and saves settings on close.
+/// </summary>
 public class MenuWindow : IDisposable
 {
     private static readonly Stopwatch swStartedProgram = Stopwatch.StartNew();
@@ -41,8 +45,10 @@ public class MenuWindow : IDisposable
     private readonly ThemeEditor themeEditor;
     private readonly Array WindowsName;
 
+    /// <summary>Whether the settings menu is currently open.</summary>
     public static bool IsOpened;
 
+    /// <summary>Builds the menu window, parses the core settings into drawers and wires up hotkeys/events.</summary>
     public MenuWindow(Core core, SettingsContainer settingsContainer, Dictionary<string, FontContainer> fonts)
     {
         this.core = core;
@@ -50,14 +56,6 @@ public class MenuWindow : IDisposable
         _CoreSettings = settingsContainer.CoreSettings;
         Fonts = fonts;
         themeEditor = new ThemeEditor(_CoreSettings);
-        /*Input.RegisterKey(Keys.F12);
-        Input.ReleaseKey += (sender, keys) =>
-        {
-            if (keys== SettingsCoreSettings.MainMenuKeyToggle.Value)
-            {
-                Enable = !Enable;
-            }
-        };*/
 
         CoreSettingsDrawers = new List<ISettingsHolder>();
 
@@ -117,8 +115,13 @@ public class MenuWindow : IDisposable
         };
     }
 
+    /// <summary>The core settings shown and edited by this window.</summary>
     public CoreSettings _CoreSettings { get; }
+
+    /// <summary>The available fonts keyed by name.</summary>
     public Dictionary<string, FontContainer> Fonts { get; }
+
+    /// <summary>The drawers built from the core settings.</summary>
     public List<ISettingsHolder> CoreSettingsDrawers { get; }
 
     private Windows OpenWindow
@@ -134,6 +137,7 @@ public class MenuWindow : IDisposable
         }
     }
 
+    /// <summary>Unsubscribes from debug collection changes and persists the core settings.</summary>
     public void Dispose()
     {
         Core.DebugInformations.CollectionChanged -= OnDebugInformationsOnCollectionChanged;
@@ -165,15 +169,10 @@ public class MenuWindow : IDisposable
                         NotMainDebugs.Add(x);
                 }
             }
-
-            /*foreach (DebugInformation argsNewItem in args.NewItems)
-            {
-
-            DebugWindow.LogMsg($"{argsNewItem.Name}",15,Color.Aqua);
-            }*/
         }
     }
 
+    /// <summary>Renders the settings menu (when enabled) and the optional performance/debug windows.</summary>
     public unsafe void Render(GameController _gameController)
     {
         if (plugins == null)
@@ -268,7 +267,6 @@ public class MenuWindow : IDisposable
 
     private void DebugWindowRender()
     {
-        // MoreInformation?.Invoke();
         var debOpen = _CoreSettings.ShowDebugWindow.Value;
         ImGui.Begin("Debug window", ref debOpen);
         _CoreSettings.ShowDebugWindow.Value = debOpen;
@@ -278,26 +276,6 @@ public class MenuWindow : IDisposable
             sw.Restart();
             refresh = true;
         }
-
-        //Tabs before 1.67
-/*            for (var index = 0; index < ((Windows[]) WindowsName).Length; index++)
-        {
-            var s = ((Windows[]) WindowsName)[index];
-            if(index>0)
-            { ImGui.SameLine();}
-
-            if (!Equals(OpenWindow, s))
-            {
-                if (ImGui.Button($"{s}##WindowName"))
-                {
-                    OpenWindow = s;
-                }
-            }
-            else
-            {
-                ImGui.TextColored(Color.OrangeRed.ToImguiV4(),$"{s}");
-            }
-        }*/
 
         ImGui.Text("Program work: ");
         ImGui.SameLine();
@@ -618,9 +596,6 @@ public class MenuWindow : IDisposable
 
     private void AddtionalInfo(DebugInformation deb)
     {
-        // ImGui.SetNextWindowPos(new Vector2(50,50));
-        //  ImGui.SetNextWindowSize(new Vector2(800,300));
-        //   ImGui.Begin($"{deb.Name}##moreinf",ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoSavedSettings);
         selectedName = deb.Name;
 
         if (!deb.AtLeastOneFullTick)
@@ -666,8 +641,6 @@ public class MenuWindow : IDisposable
 
             if (ImGui.Button($"Close##{deb.Name}")) MoreInformation = null;
         }
-
-        // ImGui.End();
     }
 
     private void DrawInfoForDebugInformation(DebugInformation deb, DebugInformation total, int groupCount)

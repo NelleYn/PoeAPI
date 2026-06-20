@@ -222,6 +222,7 @@ public class GameController : IDisposable
         }
     }
 
+    /// <summary>Computes the screen position of the map's left corner, accounting for diagnostic UI offsets.</summary>
     public Vector2 GetLeftCornerMap()
     {
         if (!InGame) return Vector2.Zero;
@@ -249,8 +250,6 @@ public class GameController : IDisposable
 
                 clientRect.Y += diagnosticElement.Y + diagnosticElement.Height;
                 var fpsRectangle = ingameState.FPSRectangle;
-
-                // clientRect.X -= fpsRectangle.X + fpsRectangle.Width + 6;
                 break;
         }
 
@@ -261,12 +260,8 @@ public class GameController : IDisposable
     {
         if (!InGame) return Vector2.Zero;
 
-        //  var questPanel = Game.IngameState.IngameUi.QuestTracker;
         var gemPanel = Game.IngameState.IngameUi.GemLvlUpPanel.Parent;
-
-        //    var questPanelRect = questPanel.GetClientRectCache();
-        RectangleF clientRect;
-        clientRect = gemPanel.GetClientRectCache;
+        var clientRect = gemPanel.GetClientRectCache;
         return new Vector2(clientRect.X + clientRect.Width, clientRect.Y + clientRect.Height);
     }
 }
