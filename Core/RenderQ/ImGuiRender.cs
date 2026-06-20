@@ -29,7 +29,7 @@ namespace ExileCore.RenderQ
     /// Hosts the ImGui context and renders its draw data with Direct3D11. Manages fonts,
     /// the overlay background windows, input routing and the per-frame draw pass.
     /// </summary>
-    public class ImGuiRender
+    public partial class ImGuiRender
     {
         /// <summary>Delegate matching the ImGui user-callback signature.</summary>
         public delegate void UserCallbackDel(ImDrawListPtr list, ImDrawCmdPtr cmd);

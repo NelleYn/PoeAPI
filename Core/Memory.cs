@@ -18,7 +18,7 @@ namespace ExileCore;
 /// <c>Read&lt;T&gt;</c> and string/array readers, and performs the initial pattern scans to locate
 /// the base offsets. All reads are best-effort and return defaults/empty on invalid addresses.
 /// </summary>
-public class Memory : IMemory
+public partial class Memory : IMemory
 {
     private bool closed;
     private readonly Stopwatch sw = Stopwatch.StartNew();

@@ -8,7 +8,7 @@ using GameOffsets.Native;
 
 namespace ExileCore.PoEMemory.MemoryObjects
 {
-    public class IngameData : RemoteMemoryObject
+    public partial class IngameData : RemoteMemoryObject
     {
         private readonly CachedValue<IngameDataOffsets> _cacheStruct;
         private readonly CachedValue<AreaTemplate> _CurrentArea;

@@ -12,7 +12,7 @@ namespace ExileCore.PoEMemory.Components;
 /// <summary>
 /// Component exposing an item's modifiers, rarity, level requirements, and human-readable stats.
 /// </summary>
-public class Mods : Component
+public partial class Mods : Component
 {
     private readonly CachedValue<ModsComponentOffsets> _cachedValue;
 

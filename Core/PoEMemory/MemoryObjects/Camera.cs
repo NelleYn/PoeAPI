@@ -5,7 +5,7 @@ using SharpDX;
 
 namespace ExileCore.PoEMemory.MemoryObjects
 {
-    public class Camera : RemoteMemoryObject
+    public partial class Camera : RemoteMemoryObject
     {
         private static Vector2 oldplayerCord;
         private readonly CameraOffsets? _cameraOffsets;

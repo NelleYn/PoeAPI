@@ -10,7 +10,7 @@ using GameOffsets;
 
 namespace ExileCore.PoEMemory.MemoryObjects
 {
-    public class ServerData : RemoteMemoryObject
+    public partial class ServerData : RemoteMemoryObject
     {
         private static readonly int NetworkStateOff =
             Extensions.GetOffset<ServerDataOffsets>(nameof(ServerDataOffsets.NetworkState)) + ServerDataOffsets.Skip;

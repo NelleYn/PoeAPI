@@ -4,7 +4,7 @@ using JM.LinqFaster;
 
 namespace ExileCore.Shared
 {
-    public class DebugInformation
+    public partial class DebugInformation
     {
         public static readonly int SizeArray = 512;
         private readonly Stopwatch sw = Stopwatch.StartNew();

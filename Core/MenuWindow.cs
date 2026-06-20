@@ -18,7 +18,7 @@ namespace ExileCore;
 /// The main HUD settings window. Renders the core/theme/plugin settings menu and the performance
 /// debug window (coroutines, caches and per-plugin timing) via ImGui, and saves settings on close.
 /// </summary>
-public class MenuWindow : IDisposable
+public partial class MenuWindow : IDisposable
 {
     private static readonly Stopwatch swStartedProgram = Stopwatch.StartNew();
     private readonly SettingsContainer _settingsContainer;

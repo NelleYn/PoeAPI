@@ -23,7 +23,7 @@ public abstract class CachedValue
 /// A lazily-evaluated value that is refreshed according to a derived cache policy.
 /// </summary>
 /// <typeparam name="T">The type of the cached value.</typeparam>
-public abstract class CachedValue<T> : CachedValue
+public abstract partial class CachedValue<T> : CachedValue
 {
     /// <summary>
     /// Delegate invoked whenever the cached value is refreshed.

@@ -8,7 +8,7 @@ using GameOffsets;
 
 namespace ExileCore.PoEMemory.MemoryObjects
 {
-    public class IngameUIElements : Element
+    public partial class IngameUIElements : Element
     {
         private Element _BetrayalWindow;
         private readonly CachedValue<IngameUElementsOffsets> _cachedValue;

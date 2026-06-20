@@ -1,0 +1,11 @@
+using ExileCore.PoEMemory.FilesInMemory.Ancestor;
+using ExileCore.Shared.Cache;
+using GameOffsets;
+
+namespace ExileCore.PoEMemory.MemoryObjects.Ancestor;
+public class AncestorSidePanelOption : Element
+{
+    private readonly CachedValue<AncestorSidePanelOffsets> _cachedValue;
+    public AncestralTrialUnit Unit => (AncestralTrialUnit)(object)this;
+    public AncestralTrialItem Item => (AncestralTrialItem)(object)this;
+}
