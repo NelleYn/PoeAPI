@@ -1,8 +1,10 @@
 using System.Collections;
 
-namespace ExileCore.Shared.Interfaces
+namespace ExileCore.Shared.Interfaces;
+
+/// <summary>
+/// Marker interface for coroutine yield conditions that are both enumerable and enumerator.
+/// </summary>
+public interface IYieldBase : IEnumerable, IEnumerator
 {
-    public interface IYieldBase : IEnumerable, IEnumerator
-    {
-    }
 }
