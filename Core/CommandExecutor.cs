@@ -9,6 +9,10 @@ using ExileCore.Shared;
 
 namespace ExileCore
 {
+    /// <summary>
+    /// Handles command-line style commands for compiling offsets and plugin source directories into
+    /// assemblies via <see cref="RoslynCompiler"/>.
+    /// </summary>
     public static class CommandExecutor
     {
         public const string Offset = "offset";
@@ -18,6 +22,11 @@ namespace ExileCore
         public const string GameOffsets = "GameOffsets.dll";
 
 
+        /// <summary>
+        /// Dispatches a command string. Supported commands compile the offsets assembly, all plugin
+        /// sources, or a single plugin (<c>compile_&lt;name&gt;</c>). Unknown commands are ignored.
+        /// </summary>
+        /// <param name="cmd">The command to execute.</param>
         public static void Execute(string cmd)
         {
             switch (cmd)
@@ -75,8 +84,20 @@ namespace ExileCore
             return _dllFiles;
         }
 
+        /// <summary>
+        /// Compiles every <c>.cs</c> file under a plugin source directory into a DLL/PDB pair in the
+        /// matching <c>Compiled</c> directory. On failure the diagnostics are written to
+        /// <c>Errors.txt</c> inside the source directory and a message box is shown.
+        /// </summary>
         private static void CompileSourceIntoDll(DirectoryInfo info)
         {
+            if (info == null || !info.Exists)
+            {
+                MessageBox.Show("Plugin source directory not found.", "Error", MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
             var sw = Stopwatch.StartNew();
 
             var csFiles = info.GetFiles("*.cs", SearchOption.AllDirectories).Select(x => x.FullName)
@@ -106,8 +127,15 @@ namespace ExileCore
             {
                 MessageBox.Show($"{info.Name} -> Failed (Errors: {result.Errors.Count}) look in {info.FullName}/Errors.txt",
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                File.WriteAllText(Path.Combine(info.FullName, "Errors.txt"),
-                    string.Join(Environment.NewLine, result.Errors));
+                try
+                {
+                    File.WriteAllText(Path.Combine(info.FullName, "Errors.txt"),
+                        string.Join(Environment.NewLine, result.Errors));
+                }
+                catch (Exception e)
+                {
+                    DebugWindow.LogError($"{info.Name} -> failed to write Errors.txt: {e.Message}");
+                }
                 return;
             }
 
