@@ -1,10 +1,13 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace GameOffsets
+namespace GameOffsets;
+
+/// <summary>
+/// Maps a buff-name entry: a single pointer to the buff's name string.
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct BuffStringOffsets
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct BuffStringOffsets
-    {
-        public long String;
-    }
+    /// <summary>Pointer to the buff name string.</summary>
+    public long String;
 }
