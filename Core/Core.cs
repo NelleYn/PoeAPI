@@ -21,10 +21,16 @@ using Color = SharpDX.Color;
 
 namespace ExileCore;
 
+/// <summary>
+/// The application root. Owns the DirectX render form, finds and attaches to the Path of Exile
+/// process, loads plugins, and drives the main render/tick and coroutine loops.
+/// </summary>
 public class Core : IDisposable
 {
     private const int JOB_TIMEOUT_MS = 1000 / 5;
     private const int TICKS_BEFORE_SLEEP = 4;
+
+    /// <summary>Global lock used to synchronize shared static state (e.g. the debug information list).</summary>
     public static object SyncLocker = new object();
     private readonly DebugInformation _allPluginsDebugInformation;
     private readonly DebugInformation _coreDebugInformation;
@@ -66,6 +72,8 @@ public class Core : IDisposable
     private int ticks;
     private double _targetPcFrameTime;
     private double _deltaTargetPcFrameTime;
+
+    /// <summary>Initializes the renderer, settings, coroutine runners and (if found) attaches to the game.</summary>
     public Core(RenderForm form)
     {
         try
@@ -114,7 +122,6 @@ public class Core : IDisposable
             MainRunner = CoroutineRunner;
             ParallelRunner = CoroutineRunnerParallel;
 
-            // Task.Run(ParallelCoroutineRunner);
             var th = new Thread(ParallelCoroutineManualThread) {Name = "Parallel Coroutine", IsBackground = true};
             th.Start();
             _mainMenu = new MenuWindow(this, _settings, _dx11.ImGuiRender.fonts);
@@ -173,11 +180,19 @@ public class Core : IDisposable
         }
     }
 
+    /// <summary>The application-wide logger.</summary>
     public static ILogger Logger { get; set; }
+
+    /// <summary>The main-thread coroutine runner.</summary>
     public static Runner MainRunner { get; set; }
+
+    /// <summary>The parallel coroutine runner.</summary>
     public static Runner ParallelRunner { get; set; }
+
+    /// <summary>The number of rendered frames since startup.</summary>
     public static uint FramesCount { get; private set; }
 
+    /// <summary>The target time per rendered frame, in milliseconds.</summary>
     public double TargetPcFrameTime
     {
         get => _targetPcFrameTime;
@@ -188,18 +203,36 @@ public class Core : IDisposable
         }
     }
 
+    /// <summary>The worker thread pool manager.</summary>
     public MultiThreadManager MultiThreadManager { get; private set; }
+
+    /// <summary>The global collection of per-component debug timing entries.</summary>
     public static ObservableCollection<DebugInformation> DebugInformations { get; } =
         new ObservableCollection<DebugInformation>();
+
+    /// <summary>The plugin manager (null until the game is attached).</summary>
     public PluginManager pluginManager { get; private set; }
     private IntPtr FormHandle { get; }
+
+    /// <summary>The main-thread coroutine runner instance.</summary>
     public Runner CoroutineRunner { get; set; }
+
+    /// <summary>The parallel coroutine runner instance.</summary>
     public Runner CoroutineRunnerParallel { get; set; }
+
+    /// <summary>The current game session controller (null when not attached).</summary>
     public GameController GameController { get; private set; }
+
+    /// <summary>Whether the game has started.</summary>
     public bool GameStarted { get; private set; }
+
+    /// <summary>The drawing facade.</summary>
     public Graphics Graphics { get; }
+
+    /// <summary>Whether the game/overlay is currently in the foreground.</summary>
     public bool IsForeground { get; private set; }
 
+    /// <summary>Disposes the memory reader, menu, game controller, renderer and all plugins.</summary>
     public void Dispose()
     {
         _memory?.Dispose();
@@ -260,6 +293,7 @@ public class Core : IDisposable
         }
     }
 
+    /// <summary>Finds a running Path of Exile process and returns a memory reader for it, or null if none is found.</summary>
     public static Memory FindPoe()
     {
         var pid = FindPoeProcess();
@@ -300,6 +334,7 @@ public class Core : IDisposable
             WinApi.SetForegroundWindow(_memory.Process.MainWindowHandle);
     }
 
+    /// <summary>Per-frame update: pumps input, renders the menu/debug overlay and ticks all enabled plugins.</summary>
     public void Tick()
     {
         try
@@ -550,6 +585,7 @@ public class Core : IDisposable
         }
     }
 
+    /// <summary>Drives the coroutine runner and the DirectX render at the configured frame rate.</summary>
     public void Render()
     {
         var startTime = Time.TotalMilliseconds;
@@ -604,6 +640,7 @@ public class Core : IDisposable
         var elTime = Time.TotalMilliseconds - startTime;
     }
 
+    /// <summary>Makes the overlay window opaque and captures mouse/keyboard input for ImGui.</summary>
     public void FixImGui()
     {
         WinApi.SetNoTransparent(_form.Handle);
