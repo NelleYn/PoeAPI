@@ -1,7 +1,10 @@
-namespace ExileCore.PoEMemory.Components
+namespace ExileCore.PoEMemory.Components;
+
+/// <summary>
+/// Component exposing the remaining time on an entity's timer.
+/// </summary>
+public class TimerComponent : Component
 {
-    public class TimerComponent : Component
-    {
-        public float TimeLeft => M.Read<float>(Address + 0x18);
-    }
+    /// <summary>Gets the time remaining, in seconds.</summary>
+    public float TimeLeft => M.Read<float>(Address + 0x18);
 }

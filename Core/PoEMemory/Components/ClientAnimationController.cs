@@ -1,7 +1,10 @@
-namespace ExileCore.PoEMemory.Components
+namespace ExileCore.PoEMemory.Components;
+
+/// <summary>
+/// Component exposing the current animation key of a client-side animation controller.
+/// </summary>
+public class ClientAnimationController : Component
 {
-    public class ClientAnimationController : Component
-    {
-        public int AnimKey => M.Read<int>(Address + 0x9c);
-    }
+    /// <summary>Gets the active animation key.</summary>
+    public int AnimKey => M.Read<int>(Address + 0x9c);
 }

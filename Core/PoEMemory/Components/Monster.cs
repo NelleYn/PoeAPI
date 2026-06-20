@@ -1,6 +1,8 @@
-namespace ExileCore.PoEMemory.Components
+namespace ExileCore.PoEMemory.Components;
+
+/// <summary>
+/// Marker component indicating that the entity is a monster.
+/// </summary>
+public class Monster : Component
 {
-    public class Monster : Component
-    {
-    }
 }
