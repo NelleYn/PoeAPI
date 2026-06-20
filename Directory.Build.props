@@ -1,0 +1,14 @@
+<Project>
+
+  <!--
+    Root build properties for the .NET 10 modernization of ExileApi.
+    Only build-safe defaults live here. Per-project .csproj values override
+    these, so this file must never contain anything that can break a build
+    (no Nullable, no TreatWarningsAsErrors, no analyzer package references).
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>
