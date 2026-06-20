@@ -4,30 +4,34 @@ using ExileCore.Shared.Cache;
 using ExileCore.Shared.Enums;
 using GameOffsets;
 
-namespace ExileCore.PoEMemory.Components
+namespace ExileCore.PoEMemory.Components;
+
+/// <summary>
+/// Component exposing map item information such as the area, tier, and map series.
+/// </summary>
+public class Map : Component
 {
-    public class Map : Component
+    private readonly Lazy<MapComponentBase> mapBase;
+    private readonly Lazy<MapComponentInner> mapInner;
+    private readonly CachedValue<WorldArea> _area;
+
+    /// <summary>Initializes a new instance of the <see cref="Map"/> class.</summary>
+    public Map()
     {
-        private readonly Lazy<MapComponentBase> mapBase;
-        private readonly Lazy<MapComponentInner> mapInner;
-        private readonly CachedValue<WorldArea> _area;
-
-        public Map()
-        {
-            mapBase = new Lazy<MapComponentBase>(() => M.Read<MapComponentBase>(Address));
-            mapInner = new Lazy<MapComponentInner>(() => M.Read<MapComponentInner>(mapBase.Value.Base));
-            _area = new StaticValueCache<WorldArea>(() => TheGame.Files.WorldAreas.GetByAddress(MapInformation.Area));
-        }
-
-        public MapComponentInner MapInformation => mapInner.Value;
-
-        //  public WorldArea Area => Global.Instance.WorldAreasGetByAddress(M.Read<long>(Address + 0x10, 0x18));
-        public WorldArea Area => _area.Value;
-
-        //   public int Tier => M.Read<int>(Address + 0x10, 0x90);
-        public byte Tier => mapBase.Value.Tier;
-
-        //   public InventoryTabMapSeries MapSeries => (InventoryTabMapSeries)M.Read<byte>(Address + 0x10, 0x9c);
-        public InventoryTabMapSeries MapSeries => (InventoryTabMapSeries) MapInformation.MapSeries;
+        mapBase = new Lazy<MapComponentBase>(() => M.Read<MapComponentBase>(Address));
+        mapInner = new Lazy<MapComponentInner>(() => M.Read<MapComponentInner>(mapBase.Value.Base));
+        _area = new StaticValueCache<WorldArea>(() => TheGame.Files.WorldAreas.GetByAddress(MapInformation.Area));
     }
+
+    /// <summary>Gets the inner map information struct.</summary>
+    public MapComponentInner MapInformation => mapInner.Value;
+
+    /// <summary>Gets the world area associated with this map.</summary>
+    public WorldArea Area => _area.Value;
+
+    /// <summary>Gets the map tier.</summary>
+    public byte Tier => mapBase.Value.Tier;
+
+    /// <summary>Gets the map series the map belongs to.</summary>
+    public InventoryTabMapSeries MapSeries => (InventoryTabMapSeries) MapInformation.MapSeries;
 }

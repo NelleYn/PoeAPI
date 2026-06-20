@@ -11,151 +11,193 @@ using ExileCore.Shared.Helpers;
 using ExileCore.Shared.Interfaces;
 using ExileCore.Shared.Static;
 
-namespace ExileCore.PoEMemory
+namespace ExileCore.PoEMemory;
+
+/// <summary>
+/// Owns the game's in-memory data tables (".dat" files), exposing each as a lazily
+/// loaded, strongly typed wrapper and tracking which files were loaded per area.
+/// </summary>
+public class FilesContainer
 {
-    public class FilesContainer
+    private readonly IMemory _memory;
+    private BaseItemTypes _baseItemTypes;
+    private UniversalFileWrapper<BetrayalChoiceAction> _betrayalChoiceActions;
+    private UniversalFileWrapper<BetrayalChoice> _betrayalChoises;
+    private UniversalFileWrapper<BetrayalDialogue> _betrayalDialogue;
+    private UniversalFileWrapper<BetrayalJob> _betrayalJobs;
+    private UniversalFileWrapper<BetrayalRank> _betrayalRanks;
+    private UniversalFileWrapper<BetrayalReward> _betrayalRewards;
+    private UniversalFileWrapper<BetrayalTarget> _betrayalTargets;
+    private ModsDat _mods;
+    private StatsDat _stats;
+    private TagsDat _tags;
+    private UniversalFileWrapper<AtlasNode> atlasNodes;
+
+    /// <summary>The reader that enumerates the game's file table from memory.</summary>
+    public FilesFromMemory FilesFromMemory;
+    private LabyrinthTrials labyrinthTrials;
+    private MonsterVarieties monsterVarieties;
+    private PassiveSkills passiveSkills;
+    private PropheciesDat prophecies;
+    private Quests quests;
+    private QuestStates questStates;
+    
+    //Will be loaded on first access:
+    private WorldAreas worldAreas;
+
+    /// <summary>Initializes the container and eagerly loads the file table from the game's memory.</summary>
+    /// <param name="memory">The memory reader used to access the game process.</param>
+    public FilesContainer(IMemory memory)
     {
-        private readonly IMemory _memory;
-        private BaseItemTypes _baseItemTypes;
-        private UniversalFileWrapper<BetrayalChoiceAction> _betrayalChoiceActions;
-        private UniversalFileWrapper<BetrayalChoice> _betrayalChoises;
-        private UniversalFileWrapper<BetrayalDialogue> _betrayalDialogue;
-        private UniversalFileWrapper<BetrayalJob> _betrayalJobs;
-        private UniversalFileWrapper<BetrayalRank> _betrayalRanks;
-        private UniversalFileWrapper<BetrayalReward> _betrayalRewards;
-        private UniversalFileWrapper<BetrayalTarget> _betrayalTargets;
-        private ModsDat _mods;
-        private StatsDat _stats;
-        private TagsDat _tags;
-        private UniversalFileWrapper<AtlasNode> atlasNodes;
-        public FilesFromMemory FilesFromMemory;
-        private LabyrinthTrials labyrinthTrials;
-        private MonsterVarieties monsterVarieties;
-        private PassiveSkills passiveSkills;
-        private PropheciesDat prophecies;
-        private Quests quests;
-        private QuestStates questStates;
-        
-        //Will be loaded on first access:
-        private WorldAreas worldAreas;
+        _memory = memory;
+        ItemClasses = new ItemClasses();
+        FilesFromMemory = new FilesFromMemory(_memory);
 
-        public FilesContainer(IMemory memory)
+        using (new PerformanceTimer("Load files from memory"))
         {
-            _memory = memory;
-            ItemClasses = new ItemClasses();
-            FilesFromMemory = new FilesFromMemory(_memory);
+            AllFiles = FilesFromMemory.GetAllFiles();
+        }
+    }
 
-            using (new PerformanceTimer("Load files from memory"))
-            {
-                AllFiles = FilesFromMemory.GetAllFiles();
-            }
+    /// <summary>Gets the parsed item-class definitions.</summary>
+    public ItemClasses ItemClasses { get; }
+    public BaseItemTypes BaseItemTypes =>
+        _baseItemTypes ?? (_baseItemTypes = new BaseItemTypes(_memory, () => FindFile("Data/BaseItemTypes.dat")));
+    public ModsDat Mods => _mods ?? (_mods = new ModsDat(_memory, () => FindFile("Data/Mods.dat"), Stats, Tags));
+    public StatsDat Stats => _stats ?? (_stats = new StatsDat(_memory, () => FindFile("Data/Stats.dat")));
+    public TagsDat Tags => _tags ?? (_tags = new TagsDat(_memory, () => FindFile("Data/Tags.dat")));
+    public WorldAreas WorldAreas => worldAreas ?? (worldAreas = new WorldAreas(_memory, () => FindFile("Data/WorldAreas.dat")));
+    public PassiveSkills PassiveSkills =>
+        passiveSkills ?? (passiveSkills = new PassiveSkills(_memory, () => FindFile("Data/PassiveSkills.dat")));
+    public LabyrinthTrials LabyrinthTrials =>
+        labyrinthTrials ?? (labyrinthTrials = new LabyrinthTrials(_memory, () => FindFile("Data/LabyrinthTrials.dat")));
+    public Quests Quests => quests ?? (quests = new Quests(_memory, () => FindFile("Data/Quest.dat")));
+    public QuestStates QuestStates => questStates ?? (questStates = new QuestStates(_memory, () => FindFile("Data/QuestStates.dat")));
+    public MonsterVarieties MonsterVarieties =>
+        monsterVarieties ?? (monsterVarieties = new MonsterVarieties(_memory, () => FindFile("Data/MonsterVarieties.dat")));
+    public PropheciesDat Prophecies => prophecies ?? (prophecies = new PropheciesDat(_memory, () => FindFile("Data/Prophecies.dat")));
+    public UniversalFileWrapper<AtlasNode> AtlasNodes =>
+        atlasNodes ?? (atlasNodes = new AtlasNodes(_memory, () => FindFile("Data/AtlasNode.dat")));
+    public UniversalFileWrapper<BetrayalTarget> BetrayalTargets =>
+        _betrayalTargets ?? (_betrayalTargets =
+            new UniversalFileWrapper<BetrayalTarget>(_memory, () => FindFile("Data/BetrayalTargets.dat")));
+    public UniversalFileWrapper<BetrayalJob> BetrayalJobs =>
+        _betrayalJobs ?? (_betrayalJobs = new UniversalFileWrapper<BetrayalJob>(_memory, () => FindFile("Data/BetrayalJobs.dat")));
+    public UniversalFileWrapper<BetrayalRank> BetrayalRanks =>
+        _betrayalRanks ?? (_betrayalRanks = new UniversalFileWrapper<BetrayalRank>(_memory, () => FindFile("Data/BetrayalRanks.dat")));
+    public UniversalFileWrapper<BetrayalReward> BetrayalRewards =>
+        _betrayalRewards ?? (_betrayalRewards =
+            new UniversalFileWrapper<BetrayalReward>(_memory, () => FindFile("Data/BetrayalTraitorRewards.dat")));
+    public UniversalFileWrapper<BetrayalChoice> BetrayalChoises =>
+        _betrayalChoises ?? (_betrayalChoises =
+            new UniversalFileWrapper<BetrayalChoice>(_memory, () => FindFile("Data/BetrayalChoices.dat")));
+    public UniversalFileWrapper<BetrayalChoiceAction> BetrayalChoiceActions =>
+        _betrayalChoiceActions ?? (_betrayalChoiceActions =
+            new UniversalFileWrapper<BetrayalChoiceAction>(_memory, () => FindFile("Data/BetrayalChoiceActions.dat")));
+    public UniversalFileWrapper<BetrayalDialogue> BetrayalDialogue =>
+        _betrayalDialogue ?? (_betrayalDialogue =
+            new UniversalFileWrapper<BetrayalDialogue>(_memory, () => FindFile("Data/BetrayalDialogue.dat")));
 
-            /*Task.Run(() =>
-            {
-                using (new PerformanceTimer("Preload stats and mods"))
-                {
-                    var test = Stats.records.Count;
-                    var test2 = Mods.records.Count;
-                    ParseFiles(AllFiles);
-                }
-            });*/
+    #region Metamorph
+
+    private UniversalFileWrapper<MetamorphMetaSkill> _metamorphMetaSkills;
+    private UniversalFileWrapper<MetamorphMetaSkillType> _metamorphMetaSkillTypes;
+    private UniversalFileWrapper<MetamorphMetaMonster> _metamorphMetaMonsters;
+    private UniversalFileWrapper<MetamorphRewardType> _metamorphRewardTypes;
+    private UniversalFileWrapper<MetamorphRewardTypeItemsClient> _metamorphRewardTypeItemsClient;
+
+    public UniversalFileWrapper<MetamorphMetaSkill> MetamorphMetaSkills =>
+        _metamorphMetaSkills ?? (_metamorphMetaSkills =
+            new UniversalFileWrapper<MetamorphMetaSkill>(_memory, () => FindFile("Data/MetamorphosisMetaSkills.dat")));
+
+    public UniversalFileWrapper<MetamorphMetaSkillType> MetamorphMetaSkillTypes =>
+        _metamorphMetaSkillTypes ?? (_metamorphMetaSkillTypes =
+            new UniversalFileWrapper<MetamorphMetaSkillType>(_memory, () => FindFile("Data/MetamorphosisMetaSkillTypes.dat")));
+
+    public UniversalFileWrapper<MetamorphMetaMonster> MetamorphMetaMonsters =>
+        _metamorphMetaMonsters ?? (_metamorphMetaMonsters =
+            new UniversalFileWrapper<MetamorphMetaMonster>(_memory, () => FindFile("Data/MetamorphosisMetaMonsters.dat")));
+
+    public UniversalFileWrapper<MetamorphRewardType> MetamorphRewardTypes =>
+        _metamorphRewardTypes ?? (_metamorphRewardTypes =
+            new UniversalFileWrapper<MetamorphRewardType>(_memory, () => FindFile("Data/MetamorphosisRewardTypes.dat")));
+
+    public UniversalFileWrapper<MetamorphRewardTypeItemsClient> MetamorphRewardTypeItemsClient =>
+        _metamorphRewardTypeItemsClient ?? (_metamorphRewardTypeItemsClient =
+            new UniversalFileWrapper<MetamorphRewardTypeItemsClient>(_memory, () => FindFile("Data/MetamorphosisRewardTypeItemsClient.dat")));
+
+    #endregion
+
+    #region NewAtlas
+
+    private AtlasRegions _atlasRegions;
+    public AtlasRegions AtlasRegions =>
+        _atlasRegions ?? (_atlasRegions = new AtlasRegions(_memory, () => FindFile("Data/AtlasRegions.dat")));
+
+    #endregion
+
+    /// <summary>Gets every file discovered in the game's file table, keyed by path.</summary>
+    public Dictionary<string, FileInformation> AllFiles { get; private set; }
+
+    /// <summary>Gets the files classified as metadata files, keyed by path.</summary>
+    public Dictionary<string, FileInformation> Metadata { get; } = new Dictionary<string, FileInformation>();
+
+    /// <summary>Gets the data table (".dat") files, keyed by path.</summary>
+    public Dictionary<string, FileInformation> Data { get; private set; } = new Dictionary<string, FileInformation>();
+
+    /// <summary>Gets all files that did not match the metadata or data categories, keyed by path.</summary>
+    public Dictionary<string, FileInformation> OtherFiles { get; } = new Dictionary<string, FileInformation>();
+
+    /// <summary>Gets the files loaded during the current game area, keyed by path.</summary>
+    public Dictionary<string, FileInformation> LoadedInThisArea { get; private set; } = new Dictionary<string, FileInformation>(1024);
+
+    /// <summary>Gets or sets files grouped by their <see cref="FileInformation.Test2"/> value.</summary>
+    public Dictionary<int, List<KeyValuePair<string, FileInformation>>> GroupedByTest2 { get; set; }
+
+    /// <summary>Gets or sets files grouped by their <see cref="FileInformation.ChangeCount"/> value.</summary>
+    public Dictionary<int, List<KeyValuePair<string, FileInformation>>> GroupedByChangeAction { get; set; }
+
+    /// <summary>Reloads the full file table synchronously from the game's memory.</summary>
+    public void LoadFiles()
+    {
+        AllFiles = FilesFromMemory.GetAllFilesSync();
+    }
+
+    /// <summary>Raised after the files loaded for the current area have been parsed.</summary>
+    public event EventHandler<Dictionary<string, FileInformation>> LoadedFiles;
+
+    /// <summary>Classifies the supplied files into metadata, data and other categories.</summary>
+    /// <param name="files">The files to classify.</param>
+    public void ParseFiles(Dictionary<string, FileInformation> files)
+    {
+        foreach (var file in files)
+        {
+            if (file.Key[0] == 'M' && file.Key[8] == '/')
+                Metadata[file.Key] = file.Value;
+            else if (file.Key[0] == 'D' && file.Key[4] == '/' && file.Key.EndsWith(".dat"))
+                Data[file.Key] = file.Value;
+            else
+                OtherFiles[file.Key] = file.Value;
         }
 
-        public ItemClasses ItemClasses { get; }
-        public BaseItemTypes BaseItemTypes =>
-            _baseItemTypes ?? (_baseItemTypes = new BaseItemTypes(_memory, () => FindFile("Data/BaseItemTypes.dat")));
-        public ModsDat Mods => _mods ?? (_mods = new ModsDat(_memory, () => FindFile("Data/Mods.dat"), Stats, Tags));
-        public StatsDat Stats => _stats ?? (_stats = new StatsDat(_memory, () => FindFile("Data/Stats.dat")));
-        public TagsDat Tags => _tags ?? (_tags = new TagsDat(_memory, () => FindFile("Data/Tags.dat")));
-        public WorldAreas WorldAreas => worldAreas ?? (worldAreas = new WorldAreas(_memory, () => FindFile("Data/WorldAreas.dat")));
-        public PassiveSkills PassiveSkills =>
-            passiveSkills ?? (passiveSkills = new PassiveSkills(_memory, () => FindFile("Data/PassiveSkills.dat")));
-        public LabyrinthTrials LabyrinthTrials =>
-            labyrinthTrials ?? (labyrinthTrials = new LabyrinthTrials(_memory, () => FindFile("Data/LabyrinthTrials.dat")));
-        public Quests Quests => quests ?? (quests = new Quests(_memory, () => FindFile("Data/Quest.dat")));
-        public QuestStates QuestStates => questStates ?? (questStates = new QuestStates(_memory, () => FindFile("Data/QuestStates.dat")));
-        public MonsterVarieties MonsterVarieties =>
-            monsterVarieties ?? (monsterVarieties = new MonsterVarieties(_memory, () => FindFile("Data/MonsterVarieties.dat")));
-        public PropheciesDat Prophecies => prophecies ?? (prophecies = new PropheciesDat(_memory, () => FindFile("Data/Prophecies.dat")));
-        public UniversalFileWrapper<AtlasNode> AtlasNodes =>
-            atlasNodes ?? (atlasNodes = new AtlasNodes(_memory, () => FindFile("Data/AtlasNode.dat")));
-        public UniversalFileWrapper<BetrayalTarget> BetrayalTargets =>
-            _betrayalTargets ?? (_betrayalTargets =
-                new UniversalFileWrapper<BetrayalTarget>(_memory, () => FindFile("Data/BetrayalTargets.dat")));
-        public UniversalFileWrapper<BetrayalJob> BetrayalJobs =>
-            _betrayalJobs ?? (_betrayalJobs = new UniversalFileWrapper<BetrayalJob>(_memory, () => FindFile("Data/BetrayalJobs.dat")));
-        public UniversalFileWrapper<BetrayalRank> BetrayalRanks =>
-            _betrayalRanks ?? (_betrayalRanks = new UniversalFileWrapper<BetrayalRank>(_memory, () => FindFile("Data/BetrayalRanks.dat")));
-        public UniversalFileWrapper<BetrayalReward> BetrayalRewards =>
-            _betrayalRewards ?? (_betrayalRewards =
-                new UniversalFileWrapper<BetrayalReward>(_memory, () => FindFile("Data/BetrayalTraitorRewards.dat")));
-        public UniversalFileWrapper<BetrayalChoice> BetrayalChoises =>
-            _betrayalChoises ?? (_betrayalChoises =
-                new UniversalFileWrapper<BetrayalChoice>(_memory, () => FindFile("Data/BetrayalChoices.dat")));
-        public UniversalFileWrapper<BetrayalChoiceAction> BetrayalChoiceActions =>
-            _betrayalChoiceActions ?? (_betrayalChoiceActions =
-                new UniversalFileWrapper<BetrayalChoiceAction>(_memory, () => FindFile("Data/BetrayalChoiceActions.dat")));
-        public UniversalFileWrapper<BetrayalDialogue> BetrayalDialogue =>
-            _betrayalDialogue ?? (_betrayalDialogue =
-                new UniversalFileWrapper<BetrayalDialogue>(_memory, () => FindFile("Data/BetrayalDialogue.dat")));
+        Data = Data.OrderBy(x => x.Key).ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
 
-        #region Metamorph
-
-        private UniversalFileWrapper<MetamorphMetaSkill> _metamorphMetaSkills;
-        private UniversalFileWrapper<MetamorphMetaSkillType> _metamorphMetaSkillTypes;
-        private UniversalFileWrapper<MetamorphMetaMonster> _metamorphMetaMonsters;
-        private UniversalFileWrapper<MetamorphRewardType> _metamorphRewardTypes;
-        private UniversalFileWrapper<MetamorphRewardTypeItemsClient> _metamorphRewardTypeItemsClient;
-
-        public UniversalFileWrapper<MetamorphMetaSkill> MetamorphMetaSkills =>
-            _metamorphMetaSkills ?? (_metamorphMetaSkills =
-                new UniversalFileWrapper<MetamorphMetaSkill>(_memory, () => FindFile("Data/MetamorphosisMetaSkills.dat")));
-
-        public UniversalFileWrapper<MetamorphMetaSkillType> MetamorphMetaSkillTypes =>
-            _metamorphMetaSkillTypes ?? (_metamorphMetaSkillTypes =
-                new UniversalFileWrapper<MetamorphMetaSkillType>(_memory, () => FindFile("Data/MetamorphosisMetaSkillTypes.dat")));
-
-        public UniversalFileWrapper<MetamorphMetaMonster> MetamorphMetaMonsters =>
-            _metamorphMetaMonsters ?? (_metamorphMetaMonsters =
-                new UniversalFileWrapper<MetamorphMetaMonster>(_memory, () => FindFile("Data/MetamorphosisMetaMonsters.dat")));
-
-        public UniversalFileWrapper<MetamorphRewardType> MetamorphRewardTypes =>
-            _metamorphRewardTypes ?? (_metamorphRewardTypes =
-                new UniversalFileWrapper<MetamorphRewardType>(_memory, () => FindFile("Data/MetamorphosisRewardTypes.dat")));
-
-        public UniversalFileWrapper<MetamorphRewardTypeItemsClient> MetamorphRewardTypeItemsClient =>
-            _metamorphRewardTypeItemsClient ?? (_metamorphRewardTypeItemsClient =
-                new UniversalFileWrapper<MetamorphRewardTypeItemsClient>(_memory, () => FindFile("Data/MetamorphosisRewardTypeItemsClient.dat")));
-
-        #endregion
-
-        #region NewAtlas
-
-        private AtlasRegions _atlasRegions;
-        public AtlasRegions AtlasRegions =>
-            _atlasRegions ?? (_atlasRegions = new AtlasRegions(_memory, () => FindFile("Data/AtlasRegions.dat")));
-
-        #endregion
-
-        public Dictionary<string, FileInformation> AllFiles { get; private set; }
-        public Dictionary<string, FileInformation> Metadata { get; } = new Dictionary<string, FileInformation>();
-        public Dictionary<string, FileInformation> Data { get; private set; } = new Dictionary<string, FileInformation>();
-        public Dictionary<string, FileInformation> OtherFiles { get; } = new Dictionary<string, FileInformation>();
-        public Dictionary<string, FileInformation> LoadedInThisArea { get; private set; } = new Dictionary<string, FileInformation>(1024);
-        public Dictionary<int, List<KeyValuePair<string, FileInformation>>> GroupedByTest2 { get; set; }
-        public Dictionary<int, List<KeyValuePair<string, FileInformation>>> GroupedByChangeAction { get; set; }
-
-        public void LoadFiles()
+    /// <summary>
+    /// Classifies all files and records those loaded for the given area-change count,
+    /// then raises <see cref="LoadedFiles"/> with the per-area subset.
+    /// </summary>
+    /// <param name="gameAreaChangeCount">The area-change count identifying the current area.</param>
+    public void ParseFiles(int gameAreaChangeCount)
+    {
+        if (AllFiles != null)
         {
-            AllFiles = FilesFromMemory.GetAllFilesSync();
-        }
+            LoadedInThisArea = new Dictionary<string, FileInformation>(1024);
 
-        public event EventHandler<Dictionary<string, FileInformation>> LoadedFiles;
-
-        public void ParseFiles(Dictionary<string, FileInformation> files)
-        {
-            foreach (var file in files)
+            foreach (var file in AllFiles)
             {
+                if (file.Value.ChangeCount == gameAreaChangeCount) LoadedInThisArea[file.Key] = file.Value;
+
                 if (file.Key[0] == 'M' && file.Key[8] == '/')
                     Metadata[file.Key] = file.Value;
                 else if (file.Key[0] == 'D' && file.Key[4] == '/' && file.Key.EndsWith(".dat"))
@@ -164,90 +206,64 @@ namespace ExileCore.PoEMemory
                     OtherFiles[file.Key] = file.Value;
             }
 
-            Data = Data.OrderBy(x => x.Key).ToDictionary(pair => pair.Key, pair => pair.Value);
+            LoadedFiles?.Invoke(this, LoadedInThisArea);
         }
-
-        public void ParseFiles(int gameAreaChangeCount)
-        {
-            if (AllFiles != null)
-            {
-                LoadedInThisArea = new Dictionary<string, FileInformation>(1024);
-
-                foreach (var file in AllFiles)
-                {
-                    if (file.Value.ChangeCount == gameAreaChangeCount) LoadedInThisArea[file.Key] = file.Value;
-
-                    if (file.Key[0] == 'M' && file.Key[8] == '/')
-                        Metadata[file.Key] = file.Value;
-                    else if (file.Key[0] == 'D' && file.Key[4] == '/' && file.Key.EndsWith(".dat"))
-                        Data[file.Key] = file.Value;
-                    else
-                        OtherFiles[file.Key] = file.Value;
-                }
-
-                /*Task.Run(() =>
-                {
-                        GroupedByTest2 = Files.GroupBy(x => x.Value.Test2).OrderBy(x=>x.Key).ToDictionary(z => z.Key, w => w.ToList());
-                         GroupedByChangeAction = Files.GroupBy(x => x.Value.ChangeCount ).OrderBy(x=>x.Key).ToDictionary(z => z.Key, w => w.ToList());
-                });
-          */
-
-                LoadedFiles?.Invoke(this, LoadedInThisArea);
-            }
-        }
-
-        public long FindFile(string name)
-        {
-            try
-            {
-                if (AllFiles.TryGetValue(name, out var result))
-                    return result.Ptr;
-            }
-            catch (KeyNotFoundException)
-            {
-                const string MESSAGE_FORMAT = "Couldn't find the file in memory: {0}\nTry to restart the game.";
-                MessageBox.Show(string.Format(MESSAGE_FORMAT, name), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Environment.Exit(1);
-            }
-
-            return 0;
-        }
-
-        #region Bestiary
-
-        private BestiaryCapturableMonsters bestiaryCapturableMonsters;
-        public BestiaryCapturableMonsters BestiaryCapturableMonsters =>
-            bestiaryCapturableMonsters != null
-                ? bestiaryCapturableMonsters
-                : bestiaryCapturableMonsters =
-                    new BestiaryCapturableMonsters(_memory, () => FindFile("Data/BestiaryCapturableMonsters.dat"));
-        private UniversalFileWrapper<BestiaryRecipe> bestiaryRecipes;
-        public UniversalFileWrapper<BestiaryRecipe> BestiaryRecipes =>
-            bestiaryRecipes != null
-                ? bestiaryRecipes
-                : bestiaryRecipes = new UniversalFileWrapper<BestiaryRecipe>(_memory, () => FindFile("Data/BestiaryRecipes.dat"));
-        private UniversalFileWrapper<BestiaryRecipeComponent> bestiaryRecipeComponents;
-        public UniversalFileWrapper<BestiaryRecipeComponent> BestiaryRecipeComponents =>
-            bestiaryRecipeComponents != null
-                ? bestiaryRecipeComponents
-                : bestiaryRecipeComponents =
-                    new UniversalFileWrapper<BestiaryRecipeComponent>(_memory, () => FindFile("Data/BestiaryRecipeComponent.dat"));
-        private UniversalFileWrapper<BestiaryGroup> bestiaryGroups;
-        public UniversalFileWrapper<BestiaryGroup> BestiaryGroups =>
-            bestiaryGroups != null
-                ? bestiaryGroups
-                : bestiaryGroups = new UniversalFileWrapper<BestiaryGroup>(_memory, () => FindFile("Data/BestiaryGroups.dat"));
-        private UniversalFileWrapper<BestiaryFamily> bestiaryFamilies;
-        public UniversalFileWrapper<BestiaryFamily> BestiaryFamilies =>
-            bestiaryFamilies != null
-                ? bestiaryFamilies
-                : bestiaryFamilies = new UniversalFileWrapper<BestiaryFamily>(_memory, () => FindFile("Data/BestiaryFamilies.dat"));
-        private UniversalFileWrapper<BestiaryGenus> bestiaryGenuses;
-        public UniversalFileWrapper<BestiaryGenus> BestiaryGenuses =>
-            bestiaryGenuses != null
-                ? bestiaryGenuses
-                : bestiaryGenuses = new UniversalFileWrapper<BestiaryGenus>(_memory, () => FindFile("Data/BestiaryGenus.dat"));
-
-        #endregion
     }
+
+    /// <summary>Looks up the pointer to the named file, exiting the process when it cannot be found.</summary>
+    /// <param name="name">The file path to resolve (e.g. "Data/Mods.dat").</param>
+    /// <returns>The pointer to the file's information record, or 0 when unavailable.</returns>
+    public long FindFile(string name)
+    {
+        try
+        {
+            if (AllFiles.TryGetValue(name, out var result))
+                return result.Ptr;
+        }
+        catch (KeyNotFoundException)
+        {
+            const string MESSAGE_FORMAT = "Couldn't find the file in memory: {0}\nTry to restart the game.";
+            MessageBox.Show(string.Format(MESSAGE_FORMAT, name), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Environment.Exit(1);
+        }
+
+        return 0;
+    }
+
+    #region Bestiary
+
+    private BestiaryCapturableMonsters bestiaryCapturableMonsters;
+    public BestiaryCapturableMonsters BestiaryCapturableMonsters =>
+        bestiaryCapturableMonsters != null
+            ? bestiaryCapturableMonsters
+            : bestiaryCapturableMonsters =
+                new BestiaryCapturableMonsters(_memory, () => FindFile("Data/BestiaryCapturableMonsters.dat"));
+    private UniversalFileWrapper<BestiaryRecipe> bestiaryRecipes;
+    public UniversalFileWrapper<BestiaryRecipe> BestiaryRecipes =>
+        bestiaryRecipes != null
+            ? bestiaryRecipes
+            : bestiaryRecipes = new UniversalFileWrapper<BestiaryRecipe>(_memory, () => FindFile("Data/BestiaryRecipes.dat"));
+    private UniversalFileWrapper<BestiaryRecipeComponent> bestiaryRecipeComponents;
+    public UniversalFileWrapper<BestiaryRecipeComponent> BestiaryRecipeComponents =>
+        bestiaryRecipeComponents != null
+            ? bestiaryRecipeComponents
+            : bestiaryRecipeComponents =
+                new UniversalFileWrapper<BestiaryRecipeComponent>(_memory, () => FindFile("Data/BestiaryRecipeComponent.dat"));
+    private UniversalFileWrapper<BestiaryGroup> bestiaryGroups;
+    public UniversalFileWrapper<BestiaryGroup> BestiaryGroups =>
+        bestiaryGroups != null
+            ? bestiaryGroups
+            : bestiaryGroups = new UniversalFileWrapper<BestiaryGroup>(_memory, () => FindFile("Data/BestiaryGroups.dat"));
+    private UniversalFileWrapper<BestiaryFamily> bestiaryFamilies;
+    public UniversalFileWrapper<BestiaryFamily> BestiaryFamilies =>
+        bestiaryFamilies != null
+            ? bestiaryFamilies
+            : bestiaryFamilies = new UniversalFileWrapper<BestiaryFamily>(_memory, () => FindFile("Data/BestiaryFamilies.dat"));
+    private UniversalFileWrapper<BestiaryGenus> bestiaryGenuses;
+    public UniversalFileWrapper<BestiaryGenus> BestiaryGenuses =>
+        bestiaryGenuses != null
+            ? bestiaryGenuses
+            : bestiaryGenuses = new UniversalFileWrapper<BestiaryGenus>(_memory, () => FindFile("Data/BestiaryGenus.dat"));
+
+    #endregion
 }

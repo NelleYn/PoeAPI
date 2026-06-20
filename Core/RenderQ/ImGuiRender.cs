@@ -25,10 +25,16 @@ using Vector2N = System.Numerics.Vector2;
 
 namespace ExileCore.RenderQ
 {
+    /// <summary>
+    /// Hosts the ImGui context and renders its draw data with Direct3D11. Manages fonts,
+    /// the overlay background windows, input routing and the per-frame draw pass.
+    /// </summary>
     public class ImGuiRender
     {
+        /// <summary>Delegate matching the ImGui user-callback signature.</summary>
         public delegate void UserCallbackDel(ImDrawListPtr list, ImDrawCmdPtr cmd);
 
+        /// <summary>Window flags producing an invisible, non-interactive, auto-sized window.</summary>
         public static readonly ImGuiWindowFlags InvisibleWindow =
             ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoSavedSettings |
             ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar |
@@ -52,6 +58,9 @@ namespace ExileCore.RenderQ
         private VertexBufferBinding vertexBuffer;
         private Viewport Viewport;
 
+        /// <summary>
+        /// Initializes ImGui, loads fonts, compiles the ImGui shaders and creates the GPU buffers and states.
+        /// </summary>
         public ImGuiRender(DX11 dx11, RenderForm form, CoreSettings coreSettings)
         {
             _form = form;
@@ -151,16 +160,32 @@ namespace ExileCore.RenderQ
             pixelShaderByteCode.Dispose();
         }
 
+        /// <summary>The owning Direct3D11 renderer.</summary>
         public DX11 Dx11 { get; set; }
+
+        /// <summary>The core settings instance.</summary>
         public CoreSettings CoreSettings { get; }
+
+        /// <summary>The bounds of the host form.</summary>
         public Rectangle FormBounds { get; set; }
+
+        /// <summary>The ImGui vertex shader.</summary>
         public VertexShader VertexShader { get; set; }
+
+        /// <summary>The ImGui pixel shader.</summary>
         public PixelShader PixelShader { get; set; }
+
         private Buffer ConstantBuffer { get; }
         private Buffer VertexBuffer { get; set; }
         private Buffer IndexBuffer { get; set; }
+
+        /// <summary>The input layout describing the ImGui vertex format.</summary>
         public InputLayout Layout { get; set; }
+
+        /// <summary>The ImGui IO pointer for the current context.</summary>
         public ImGuiIOPtr io { get; private set; }
+
+        /// <summary>The font atlas texture bound to ImGui.</summary>
         public ShaderResourceView FontTexture { get; private set; }
 
         private int VertexBufferSize
@@ -173,6 +198,7 @@ namespace ExileCore.RenderQ
             }
         }
 
+        /// <summary>The size of the ImGui vertex buffer in bytes.</summary>
         public int VertexBufferSizeBytes { get; set; }
 
         private int IndexBufferSize
@@ -185,8 +211,13 @@ namespace ExileCore.RenderQ
             }
         }
 
+        /// <summary>The size of the ImGui index buffer in bytes.</summary>
         public int IndexBufferSizeBytes { get; set; }
 
+        /// <summary>
+        /// Gets or sets whether the host window is click-through transparent. Toggling updates the
+        /// underlying Win32 window style.
+        /// </summary>
         public bool TransparentState
         {
             get => _transparentState1;
@@ -201,9 +232,15 @@ namespace ExileCore.RenderQ
             }
         }
 
+        /// <summary>The loaded fonts keyed by "name:size".</summary>
         public Dictionary<string, FontContainer> fonts { get; } = new Dictionary<string, FontContainer>();
+
+        /// <summary>The background-window draw list used for low-level shape drawing.</summary>
         public ImDrawListPtr LowLevelApi => _backGroundWindowPtr;
+
         private FontContainer lastFontContainer { get; set; }
+
+        /// <summary>The font most recently used for drawing.</summary>
         public FontContainer CurrentFont => lastFontContainer;
 
         private void InitializeInputSystem()
@@ -310,9 +347,16 @@ namespace ExileCore.RenderQ
             };
         }
 
+        /// <summary>Raised when ImGui begins capturing mouse/keyboard input.</summary>
         public event EventHandler GetFocus;
+
+        /// <summary>Raised when ImGui stops capturing mouse/keyboard input.</summary>
         public event EventHandler LostFocus;
 
+        /// <summary>
+        /// Updates ImGui input state for the frame and toggles window transparency based on whether
+        /// ImGui wants to capture mouse or keyboard.
+        /// </summary>
         public void InputUpdate(double tick)
         {
             io = ImGui.GetIO();
@@ -344,7 +388,6 @@ namespace ExileCore.RenderQ
                 ImGui.SetCurrentContext(context);
                 io = ImGui.GetIO();
 
-                // io.ConfigFlags = ImGuiConfigFlags.NavEnableKeyboard;
                 SetSize(FormBounds);
 
                 using (new PerformanceTimer("Load manual fonts"))
@@ -429,6 +472,7 @@ namespace ExileCore.RenderQ
             io.DisplaySize = new Vector2N(Dx11.BackBuffer.Description.Width, Dx11.BackBuffer.Description.Height);
         }
 
+        /// <summary>Rebuilds the orthographic projection matrix from the current display size and uploads it.</summary>
         public void UpdateConstantBuffer()
         {
             mvp2 = Matrix4x4.CreateOrthographicOffCenter(0f, io.DisplaySize.X, io.DisplaySize.Y, 0.0f, -1.0f, 1.0f);
@@ -462,10 +506,12 @@ namespace ExileCore.RenderQ
             return shaderResourceView;
         }
 
+        /// <summary>
+        /// Begins the two fullscreen, input-less background windows used to host the overlay's
+        /// shape and text draw lists for the current frame.
+        /// </summary>
         public void BeginBackGroundWindow()
         {
-            //Overlay 
-            //BackGroundWindowPtr = ImGui.GetOverlayDrawList(); 
             ImGui.SetNextWindowContentSize(io.DisplaySize);
             ImGui.SetNextWindowPos(new Vector2N(0, 0));
 
@@ -493,16 +539,22 @@ namespace ExileCore.RenderQ
             ImGui.End();
         }
 
+        /// <summary>Measures the rendered size of the given text with the current font.</summary>
         public Vector2N MeasureText(string text)
         {
             return ImGui.CalcTextSize(text);
         }
 
+        /// <summary>Measures the rendered size of the given text. The <paramref name="height"/> argument is unused.</summary>
         public Vector2N MeasureText(string text, int height)
         {
             return ImGui.CalcTextSize(text);
         }
 
+        /// <summary>
+        /// Draws text onto the background text window using the specified font, color and alignment,
+        /// returning the measured text size.
+        /// </summary>
         public unsafe Vector2N DrawText(string text, Vector2N position, Color color, int height, string fontName,
             FontAlign align)
         {
@@ -573,6 +625,7 @@ namespace ExileCore.RenderQ
             }
         }
 
+        /// <summary>Draws a cached texture into the given rectangle using the supplied UV rectangle.</summary>
         public void DrawImage(string fileName, RectangleF rectangle, RectangleF uv)
         {
             _backGroundTextWindowPtr.AddImage(Dx11.GetTexture(fileName).NativePointer, rectangle.TopLeft.ToVector2Num(),
@@ -580,6 +633,7 @@ namespace ExileCore.RenderQ
                 uv.BottomRight.ToVector2Num());
         }
 
+        /// <summary>Draws a cached texture between the given corners using the supplied UV corners.</summary>
         public void DrawImage(string filename, Vector2N TopLeft, Vector2N BottomRight, Vector2N TopLeft_UV,
             Vector2N BottomRight_UV)
         {
@@ -587,6 +641,10 @@ namespace ExileCore.RenderQ
                 BottomRight_UV);
         }
 
+        /// <summary>
+        /// Draws text containing inline color markers (<c>#RRGGBBAA#</c>) onto the overlay,
+        /// returning the final pen position.
+        /// </summary>
         [Description("Count Colors means how many colors used in text, if you use a lot colors need put number more than colors you have." +
                      "This used for optimization.")]
         public Vector2N DrawMultiColoredText(string text, Vector2N position, FontAlign align = FontAlign.Left,
@@ -719,6 +777,9 @@ namespace ExileCore.RenderQ
             return size;
         }
 
+        /// <summary>
+        /// Emits text containing inline color markers (<c>#RRGGBBAA#</c>) using the ImGui text widgets.
+        /// </summary>
         [Description(
             "Count Colors means how many colors used in text, if you use a lot colors need put number more than colors you have." +
             "This used for optimization.")]
@@ -818,6 +879,7 @@ namespace ExileCore.RenderQ
             }
         }
 
+        /// <summary>Debug helper that draws each loaded font sample plus some primitive shapes and metrics.</summary>
         public unsafe void TestDraws()
         {
             var i = 0;
@@ -853,6 +915,10 @@ namespace ExileCore.RenderQ
             _backGroundWindowPtr.AddLine(new Vector2N(10, 10), new Vector2N(300, 300), Color.Blue.ToImgui(), 5);
         }
 
+        /// <summary>
+        /// Renders the accumulated ImGui draw data: grows the GPU buffers if needed, uploads the
+        /// vertex/index data and issues the per-command clipped draw calls.
+        /// </summary>
         public void Render()
         {
             ImGui.Render();
@@ -929,14 +995,6 @@ namespace ExileCore.RenderQ
                 {
                     var drawCmd = cmdList.CmdBuffer[n];
 
-                    // User callback (registered via ImDrawList::AddCallback)
-                    //Now working o
-                    /*if (drawCmd.UserCallback != IntPtr.Zero)
-                    {
-                        var delegateForFunctionPointer =(UserCallbackDel) Marshal.GetDelegateForFunctionPointer(drawCmd.UserCallback, typeof(UserCallbackDel));
-                       // delegateForFunctionPointer(cmdList, drawCmd);
-                        delegateForFunctionPointer?.Invoke(cmdList,drawCmd);
-                    }*/
                     if (!Dx11.HasTexture(drawCmd.TextureId))
                     {
                         throw new InvalidOperationException(
@@ -958,23 +1016,15 @@ namespace ExileCore.RenderQ
             }
         }
 
+        /// <summary>Updates the ImGui display size after the host form is resized.</summary>
         public void Resize(Rectangle formBounds)
         {
             SetSize(formBounds);
         }
 
+        /// <summary>Creates the sampler, blend, depth-stencil and rasterizer states used by the ImGui pass.</summary>
         public void CreateStates()
         {
-            /*Viewport = new Viewport
-            {
-                Height = (int) io.DisplaySize.Y,
-                Width = (int) io.DisplaySize.X,
-                X = 0,
-                Y = 0,
-                MinDepth = 0,
-                MaxDepth = 1
-            };*/
-
             samplerState = new SamplerState(Dx11.D11Device,
                 new SamplerStateDescription
                 {
@@ -1000,7 +1050,6 @@ namespace ExileCore.RenderQ
             blendStateDescription.RenderTarget[0].RenderTargetWriteMask = ColorWriteMaskFlags.All;
             blendState = new BlendState(Dx11.D11Device, blendStateDescription);
 
-            // outputMergerBlendFactor = new RawColor4(0, 0f, 0, 0f);
             //Depth
             var depthStencilStateDescription = new DepthStencilStateDescription
             {
@@ -1030,11 +1079,10 @@ namespace ExileCore.RenderQ
                 });
         }
 
+        /// <summary>Binds the ImGui shaders, buffers, input layout, sampler and render states for the draw pass.</summary>
         public void SetRenderState()
         {
             Dx11.DeviceContext.Rasterizer.State = SolidState;
-
-            //  Dx11.DeviceContext.Rasterizer.SetViewport(Viewport);
 
             Dx11.DeviceContext.InputAssembler.InputLayout = Layout;
             vertexBuffer = new VertexBufferBinding {Buffer = VertexBuffer, Stride = sizeOfImDrawVert, Offset = 0};
@@ -1046,8 +1094,6 @@ namespace ExileCore.RenderQ
             Dx11.DeviceContext.PixelShader.Set(PixelShader);
             Dx11.DeviceContext.PixelShader.SetSampler(0, samplerState);
 
-            //Dx11.DeviceContext.OutputMerger.BlendFactor = outputMergerBlendFactor;
-            //Dx11.DeviceContext.OutputMerger.BlendSampleMask = Int32.MaxValue; 
             Dx11.DeviceContext.OutputMerger.SetBlendState(blendState);
             Dx11.DeviceContext.OutputMerger.SetDepthStencilState(depthStencilState);
         }

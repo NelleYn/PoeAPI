@@ -1,25 +1,32 @@
 using System;
 
-namespace ExileCore.Shared.Cache
+namespace ExileCore.Shared.Cache;
+
+/// <summary>
+/// A cached value that is recomputed once per rendered frame.
+/// </summary>
+/// <typeparam name="T">The type of the cached value.</typeparam>
+public class FrameCache<T> : CachedValue<T>
 {
-    public class FrameCache<T> : CachedValue<T>
+    private uint _frame;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FrameCache{T}"/> class.
+    /// </summary>
+    /// <param name="func">The function used to produce the cached value.</param>
+    public FrameCache(Func<T> func) : base(func)
     {
-        private uint _frame;
+        _frame = uint.MaxValue;
+    }
 
-        public FrameCache(Func<T> func) : base(func)
+    protected override bool Update(bool force)
+    {
+        if (_frame != Core.FramesCount || force)
         {
-            _frame = uint.MaxValue;
+            _frame = Core.FramesCount;
+            return true;
         }
 
-        protected override bool Update(bool force)
-        {
-            if (_frame != Core.FramesCount || force)
-            {
-                _frame = Core.FramesCount;
-                return true;
-            }
-
-            return false;
-        }
+        return false;
     }
 }

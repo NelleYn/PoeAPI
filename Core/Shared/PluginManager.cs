@@ -173,12 +173,23 @@ namespace ExileCore.Shared
         }
 
 
+        /// <summary>
+        /// Compiles a single source plugin directory into an in-memory assembly using
+        /// <see cref="RoslynCompiler"/>. On failure the diagnostics are logged and written to an
+        /// <c>Errors.txt</c> file inside the plugin directory. Returns <c>null</c> on failure.
+        /// </summary>
         private Assembly CompilePlugin(DirectoryInfo info, string[] dllFiles)
         {
+            if (info == null || !info.Exists)
+            {
+                LogError($"{nameof(CompilePlugin)} -> plugin directory not found.");
+                return null;
+            }
+
             var csFiles = info.GetFiles("*.cs", SearchOption.AllDirectories).Select(x => x.FullName)
                 .ToArray();
 
-            var references = new List<string>(dllFiles);
+            var references = new List<string>(dllFiles ?? Array.Empty<string>());
 
             var libsFolder = Path.Combine(info.FullName, "libs");
             if (Directory.Exists(libsFolder))
@@ -191,8 +202,15 @@ namespace ExileCore.Shared
                 foreach (var error in result.Errors)
                     Logger.Log.Error($"{info.Name} -> {error}");
 
-                File.WriteAllText(Path.Combine(info.FullName, "Errors.txt"),
-                    string.Join(Environment.NewLine, result.Errors));
+                try
+                {
+                    File.WriteAllText(Path.Combine(info.FullName, "Errors.txt"),
+                        string.Join(Environment.NewLine, result.Errors));
+                }
+                catch (Exception e)
+                {
+                    LogError($"{info.Name} -> failed to write Errors.txt: {e.Message}");
+                }
 
                 return null;
             }

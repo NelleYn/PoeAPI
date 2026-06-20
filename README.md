@@ -25,27 +25,46 @@ This fork targets **net10.0-windows** with SDK-style projects (`Core`, `GameOffs
 `packages.config` and no Fody. Source plugins are compiled at runtime with the **Roslyn**
 APIs (`Microsoft.CodeAnalysis.CSharp`) rather than the legacy CodeDom provider.
 
+This is **Windows-only**: it hosts a Windows Forms / DirectX 11 window and reads a live
+Path of Exile process. It does not build or run off Windows or without the game.
+
 Build requirements:
-* .NET 10 SDK (x64) and a Windows machine with ExileApi assets.
-* SharpDX 4.2 (NuGet) + `ImGui.NET.dll` / `cimgui.dll` (shipped in `deps/`). If you run a
-  different ExileApi-Compiled build, swap those two binaries for the matching version.
+* .NET 10 SDK (x64) on Windows. (End users only need the .NET 10 Desktop Runtime above.)
+* SharpDX 4.2 + the other NuGet packages are restored automatically. `ImGui.NET.dll` /
+  `cimgui.dll` ship in `deps/`; swap those two binaries if you run a different
+  ExileApi-Compiled build that needs a matching version.
 
-Compilation:
-* Create a HUD folder, clone this repo into it (e.g. `HUD\ExileApi`).
-* `dotnet build -c Release ExileApi.sln` (or build `Loader/Loader.csproj`).
-* Output (`ExileCore.dll`, `GameOffsets.dll`, `Loader.exe`, `cimgui.dll`, textures) is copied
-  to `..\PoeHelper\`. Run `Loader.exe` from there.
+Building:
+* Clone this repo (e.g. into `HUD\ExileApi`).
+* `dotnet build -c Release ExileApi.sln` (or build just `Loader/Loader.csproj`).
+* Every project sets `OutputPath` to `..\..\PoeHelper\`, so the output
+  (`Loader.exe`, `ExileCore.dll`, `GameOffsets.dll`, `cimgui.dll`, textures, ...) lands in
+  `PoeHelper\` next to the repo. Run `Loader.exe` from there with PoE running.
 
-Building plugins against this fork:
-* Point a consumer plugin's `ExileApiDir` at the `PoeHelper` output, e.g.
-  `dotnet build -c Release -p:ExileApiDir=C:\HUD\PoeHelper`. The plugin resolves
-  `ExileCore.dll` / `GameOffsets.dll` / `SharpDX*.dll` from there and drops its compiled DLL
-  into `PoeHelper\Plugins\Compiled\<name>\`.
+Plugins:
+* Compiled plugins go in `Plugins\Compiled\<name>\` (a `<name>*.dll` per folder); source
+  plugins go in `Plugins\Source\<name>\`. At startup `PluginManager` loads the compiled
+  ones and compiles any source plugins in memory with Roslyn (compiled take priority over a
+  same-named source folder).
+* You can also compile a source plugin to a DLL on disk at runtime via the
+  `compile_<name>` / `compile_plugins` commands. See
+  [docs/plugin-compiler.md](docs/plugin-compiler.md) for the full reference-gathering and
+  compilation flow.
 
 Notes:
 * Memory offsets (`GameOffsets`) are tied to the current PoE build. `IngameData.Terrain` is
   wired up, but the `TerrainData` position inside `IngameDataOffsets` must be verified against
-  your reference for the patch you run (see the note in `GameOffsets/TerrainData.cs`).
+  your reference for the patch you run (see the note in `GameOffsets/TerrainData.cs` and
+  [docs/offsets.md](docs/offsets.md)).
+
+## Developer docs
+
+* [docs/architecture.md](docs/architecture.md) — modules and how memory reading →
+  components → memory objects → rendering fit together.
+* [docs/plugin-compiler.md](docs/plugin-compiler.md) — how the Roslyn-based plugin (and
+  `GameOffsets`) compilation works.
+* [docs/offsets.md](docs/offsets.md) — how `GameOffsets` structs map live memory via
+  `[FieldOffset]` and expose the walkable terrain grid.
 
 ## Troubleshooting
 

@@ -14,10 +14,18 @@ using Vector4 = System.Numerics.Vector4;
 
 namespace ExileCore.RenderQ
 {
+    /// <summary>
+    /// Loads, saves, applies and edits ImGui style themes, and renders the in-overlay theme
+    /// settings menu.
+    /// </summary>
     public class ThemeEditor
     {
+        /// <summary>The file extension used for theme files.</summary>
         public const string ThemeExtension = ".hudtheme";
+
+        /// <summary>The name of the built-in default theme.</summary>
         public const string DefaultThemeName = "Default";
+
         private const string ThemesFolder = "config/themes";
         private readonly CoreSettings coreSettings;
         private ThemeConfig LoadedTheme;
@@ -25,6 +33,9 @@ namespace ExileCore.RenderQ
         private int SelectedThemeId;
         private string SelectedThemeName;
 
+        /// <summary>
+        /// Ensures the themes folder and default theme exist, then loads and applies the configured theme.
+        /// </summary>
         public ThemeEditor(CoreSettings coreSettings)
         {
             this.coreSettings = coreSettings;
@@ -53,6 +64,7 @@ namespace ExileCore.RenderQ
                 .Select(x => Path.GetFileNameWithoutExtension(x.Name)).ToList();
         }
 
+        /// <summary>Renders the theme selection, save/create controls and the live style/color editors.</summary>
         public void DrawSettingsMenu()
         {
             if (ImGui.Combo("Select Theme", ref SelectedThemeId, coreSettings.Theme.Values.ToArray(), coreSettings.Theme.Values.Count))
@@ -144,8 +156,6 @@ namespace ExileCore.RenderQ
                     if (ImGui.ColorEdit4(nameFixed, ref colorValue,
                             ImGuiColorEditFlags.AlphaBar | ImGuiColorEditFlags.NoInputs |
                             ImGuiColorEditFlags.AlphaPreviewHalf))
-
-                        //    style.SetColor(type, colorValue);
                         ImGui.PushStyleColor(type, colorValue);
 
                     if (count-- == -1)
@@ -172,6 +182,7 @@ namespace ExileCore.RenderQ
             return result;
         }
 
+        /// <summary>Loads the named theme (falling back to the default) and applies it to the current ImGui style.</summary>
         public static void ApplyTheme(string fileName)
         {
             var theme = LoadTheme(fileName, true);
@@ -192,6 +203,7 @@ namespace ExileCore.RenderQ
             ApplyTheme(theme);
         }
 
+        /// <summary>Applies the given theme's style values and colors to the current ImGui style.</summary>
         public static void ApplyTheme(ThemeConfig theme)
         {
             var style = ImGui.GetStyle();
@@ -323,9 +335,6 @@ namespace ExileCore.RenderQ
             resultTheme.Colors.Add(ImGuiCol.ResizeGripHovered, new Vector4(0.78f, 0.82f, 1.00f, 0.60f));
             resultTheme.Colors.Add(ImGuiCol.ResizeGripActive, new Vector4(0.78f, 0.82f, 1.00f, 0.90f));
 
-            //  resultTheme.Colors.Add(ImGuiCol.CloseButton, new Vector4(0.50f, 0.50f, 0.90f, 0.50f));
-            //   resultTheme.Colors.Add(ImGuiCol.CloseButtonHovered, new Vector4(0.70f, 0.70f, 0.90f, 0.60f));
-            //    resultTheme.Colors.Add(ImGuiCol.CloseButtonActive, new Vector4(0.70f, 0.70f, 0.70f, 1.00f));
             resultTheme.Colors.Add(ImGuiCol.PlotLines, new Vector4(1.00f, 1.00f, 1.00f, 1.00f));
             resultTheme.Colors.Add(ImGuiCol.PlotLinesHovered, new Vector4(0.90f, 0.70f, 0.00f, 1.00f));
             resultTheme.Colors.Add(ImGuiCol.PlotHistogram, new Vector4(0.90f, 0.70f, 0.00f, 1.00f));
@@ -388,15 +397,21 @@ namespace ExileCore.RenderQ
         #endregion
     }
 
+    /// <summary>
+    /// Serializable description of an ImGui theme: the style metrics and the per-element colors.
+    /// </summary>
     public class ThemeConfig : ISettings
     {
+        /// <summary>The colors for each ImGui style element.</summary>
         public Dictionary<ImGuiCol, Vector4> Colors = new Dictionary<ImGuiCol, Vector4>();
 
+        /// <summary>Initializes a new theme config with default style values.</summary>
         public ThemeConfig()
         {
             Enable = new ToggleNode(true);
         }
 
+        /// <summary>Whether the theme is enabled.</summary>
         public ToggleNode Enable { get; set; }
 
         #region ThemeSettings

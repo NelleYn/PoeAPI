@@ -1,7 +1,10 @@
-namespace ExileCore.PoEMemory.Components
+namespace ExileCore.PoEMemory.Components;
+
+/// <summary>
+/// Component exposing the magnetic force of an in-game object.
+/// </summary>
+public class Magnetic : Component
 {
-    public class Magnetic : Component
-    {
-        public int Force => M.Read<int>(Address + 0x30);
-    }
+    /// <summary>Gets the magnetic force value.</summary>
+    public int Force => M.Read<int>(Address + 0x30);
 }

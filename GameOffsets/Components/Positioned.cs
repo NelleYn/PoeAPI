@@ -1,18 +1,17 @@
-namespace GameOffsets.Components
-{
-    using System.Runtime.InteropServices;
-    using SharpDX;
-    using GameOffsets.Native;
+using System.Runtime.InteropServices;
+using SharpDX;
+using GameOffsets.Native;
 
-    [StructLayout(LayoutKind.Explicit, Pack = 1)]
-    public struct Positioned
-    {
-        [FieldOffset(0x0000)] public ComponentHeader Header;
-        [FieldOffset(0x0058)] public byte Reaction;
-        [FieldOffset(0x00EC)] public Vector2i CurrentGridPosition;
-        [FieldOffset(0x00F4)] public float Rotation;
-        [FieldOffset(0x0118)] public Vector2 CurrentWorldPosition;
-    }
+namespace GameOffsets.Components;
+
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public struct Positioned
+{
+    [FieldOffset(0x0000)] public ComponentHeader Header;
+    [FieldOffset(0x0058)] public byte Reaction;
+    [FieldOffset(0x00EC)] public Vector2i CurrentGridPosition;
+    [FieldOffset(0x00F4)] public float Rotation;
+    [FieldOffset(0x0118)] public Vector2 CurrentWorldPosition;
 }
 
 // Amount of data in this component is a lot, but HUD don't really need all of it.

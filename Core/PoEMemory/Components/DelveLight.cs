@@ -1,6 +1,8 @@
-namespace ExileCore.PoEMemory.Components
+namespace ExileCore.PoEMemory.Components;
+
+/// <summary>
+/// Marker component indicating that the entity provides Delve light radius.
+/// </summary>
+public class DelveLight : Component
 {
-    public class DelveLight : Component
-    {
-    }
 }

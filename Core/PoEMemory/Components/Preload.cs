@@ -1,6 +1,8 @@
-namespace ExileCore.PoEMemory.Components
+namespace ExileCore.PoEMemory.Components;
+
+/// <summary>
+/// Marker component associated with preloaded entities.
+/// </summary>
+public class Preload : Component
 {
-    public class Preload : Component
-    {
-    }
 }
