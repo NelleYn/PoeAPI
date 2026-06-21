@@ -6,14 +6,10 @@ partial class Memory
 {
     private class EmptyDisposable : IDisposable
     {
-        public static readonly EmptyDisposable Instance;
+        public static readonly EmptyDisposable Instance = new EmptyDisposable();
+
         public void Dispose()
         {
-        }
-
-        static EmptyDisposable()
-        {
-            new EmptyDisposable();
         }
     }
 }
