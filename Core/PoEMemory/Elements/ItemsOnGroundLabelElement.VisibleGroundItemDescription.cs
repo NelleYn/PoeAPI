@@ -10,88 +10,11 @@ partial class ItemsOnGroundLabelElement
 {
     public record VisibleGroundItemDescription
     {
-        [CompilerGenerated]
-        protected virtual Type EqualityContract
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (Type)typeof(VisibleGroundItemDescription).TypeHandle;
-            }
-        }
-
-        public Element Label
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (Element)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public Entity Entity
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (Entity)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public RectangleF ClientRect
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (RectangleF)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
+        public Element Label { get; init; }
+        public Entity Entity { get; init; }
+        public RectangleF ClientRect { get; init; }
 
         public VisibleGroundItemDescription(Element Label, Entity Entity, RectangleF ClientRect)
-        {
-        }
-
-        [CompilerGenerated]
-        public override string ToString()
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        protected virtual bool PrintMembers(StringBuilder builder)
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        public override int GetHashCode()
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        public virtual bool Equals(VisibleGroundItemDescription? other)
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        protected VisibleGroundItemDescription(VisibleGroundItemDescription original)
         {
         }
 

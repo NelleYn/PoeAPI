@@ -6,18 +6,6 @@ partial class PluginManager
 {
     private class PluginMountConfig
     {
-        public string SourcePath
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (string)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
+        public string SourcePath { get; set; }
     }
 }

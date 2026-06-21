@@ -18,37 +18,9 @@ internal class SnapshotMemoryBackend : IMemoryBackend, IDisposable
         }
     }
 
-    public long Size
-    {
-        [CompilerGenerated]
-        get
-        {
-            //IL_0002: Expected I8, but got O
-            return (long)this;
-        }
-
-        [CompilerGenerated]
-        private set
-        {
-        }
-    }
-
+    public long Size { get; private set; }
     public IReadOnlyCollection<KeyValuePair<long, byte[]>> Data => (IReadOnlyCollection<KeyValuePair<long, byte[]>>)this;
-
-    public bool IsCompleted
-    {
-        [CompilerGenerated]
-        get
-        {
-            //IL_0002: Expected I4, but got O
-            return (byte)(int)this != 0;
-        }
-
-        [CompilerGenerated]
-        private set
-        {
-        }
-    }
+    public bool IsCompleted { get; private set; }
 
     public SnapshotMemoryBackend(Process process, bool freezeProcess)
     {

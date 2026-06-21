@@ -19,47 +19,9 @@ partial class PluginManager
             }
         }
 
-        public Assembly Assembly
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (Assembly)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public string PathOnDisk
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (string)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public PluginAssemblyLoadContext LoadContext
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (PluginAssemblyLoadContext)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
+        public Assembly Assembly { get; init; }
+        public string PathOnDisk { get; init; }
+        public PluginAssemblyLoadContext LoadContext { get; init; }
 
         public LoadedAssembly(Assembly Assembly, string PathOnDisk, PluginAssemblyLoadContext LoadContext)
         {

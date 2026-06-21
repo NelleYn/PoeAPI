@@ -18,47 +18,9 @@ partial class PluginManager
             }
         }
 
-        public string PluginId
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (string)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public string Category
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (string)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public string Notification
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (string)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
+        public string PluginId { get; init; }
+        public string Category { get; init; }
+        public string Notification { get; init; }
 
         public NotificationId(string PluginId, string Category, string Notification)
         {

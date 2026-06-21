@@ -19,48 +19,9 @@ partial class MenuWindow
             }
         }
 
-        public DebugInformation Current
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (DebugInformation)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public DebugInformation TotalDebug
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (DebugInformation)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public int GroupCount
-        {
-            [CompilerGenerated]
-            get
-            {
-                //IL_0002: Expected I4, but got O
-                return (int)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
+        public DebugInformation Current { get; init; }
+        public DebugInformation TotalDebug { get; init; }
+        public int GroupCount { get; init; }
 
         public readonly string Name;
         public readonly float Percent;

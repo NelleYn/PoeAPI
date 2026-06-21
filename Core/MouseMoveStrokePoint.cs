@@ -16,33 +16,8 @@ public sealed record MouseMoveStrokePoint
         }
     }
 
-    public Vector2 Point
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (Vector2)this;
-        }
-
-        [CompilerGenerated]
-        init
-        {
-        }
-    }
-
-    public TimeSpan Delay
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (TimeSpan)this;
-        }
-
-        [CompilerGenerated]
-        init
-        {
-        }
-    }
+    public Vector2 Point { get; init; }
+    public TimeSpan Delay { get; init; }
 
     public MouseMoveStrokePoint(Vector2 Point, TimeSpan Delay)
     {

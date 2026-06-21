@@ -6,61 +6,10 @@ using Microsoft.Build.Utilities;
 namespace ExileCore.Shared;
 public class MsBuildLogger : Logger
 {
-    public IList<BuildTarget> Targets
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (IList<BuildTarget>)this;
-        }
-
-        [CompilerGenerated]
-        private set
-        {
-        }
-    }
-
-    public IList<BuildError> Errors
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (IList<BuildError>)this;
-        }
-
-        [CompilerGenerated]
-        private set
-        {
-        }
-    }
-
-    public IList<BuildWarning> Warnings
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (IList<BuildWarning>)this;
-        }
-
-        [CompilerGenerated]
-        private set
-        {
-        }
-    }
-
-    public IList<string> BuildDetails
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (IList<string>)this;
-        }
-
-        [CompilerGenerated]
-        private set
-        {
-        }
-    }
+    public IList<BuildTarget> Targets { get; private set; }
+    public IList<BuildError> Errors { get; private set; }
+    public IList<BuildWarning> Warnings { get; private set; }
+    public IList<string> BuildDetails { get; private set; }
 
     public override void Initialize(IEventSource eventSource)
     {

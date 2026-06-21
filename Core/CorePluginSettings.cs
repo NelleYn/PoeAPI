@@ -19,19 +19,7 @@ public class CorePluginSettings
             public string Name;
             public Vector4 Color;
             public bool CollapsedByDefault;
-            public Guid Id
-            {
-                [CompilerGenerated]
-                get
-                {
-                    return (Guid)this;
-                }
-
-                [CompilerGenerated]
-                init
-                {
-                }
-            }
+            public Guid Id { get; init; }
         }
 
         public List<PluginFolder> PluginFolders;
@@ -83,173 +71,18 @@ public class CorePluginSettings
             }
         }
 
-        public ToggleNode Show
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ToggleNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ToggleNode ShowWhenNoNotifications
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ToggleNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ToggleNode MoveWhenSettingsOpen
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ToggleNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ListNode MinMapEventLevel
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ListNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ListNode MinEventLevel
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ListNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ColorNode VerboseNotificationColor
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ColorNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ColorNode DebugNotificationColor
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ColorNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ColorNode InfoNotificationColor
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ColorNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ColorNode WarningNotificationColor
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ColorNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ColorNode ErrorNotificationColor
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ColorNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ColorNode FatalNotificationColor
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ColorNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public Categories CategoriesSettings
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (Categories)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
+        public ToggleNode Show { get; set; } = new();
+        public ToggleNode ShowWhenNoNotifications { get; set; } = new();
+        public ToggleNode MoveWhenSettingsOpen { get; set; } = new();
+        public ListNode MinMapEventLevel { get; set; } = new();
+        public ListNode MinEventLevel { get; set; } = new();
+        public ColorNode VerboseNotificationColor { get; set; } = new();
+        public ColorNode DebugNotificationColor { get; set; } = new();
+        public ColorNode InfoNotificationColor { get; set; } = new();
+        public ColorNode WarningNotificationColor { get; set; } = new();
+        public ColorNode ErrorNotificationColor { get; set; } = new();
+        public ColorNode FatalNotificationColor { get; set; } = new();
+        public Categories CategoriesSettings { get; set; }
 
         public PluginNotificationSettings()
         {
@@ -258,137 +91,26 @@ public class CorePluginSettings
     }
 
     [Menu("Load source plugins in parallel", "Requires restart to apply. When you use a lot of plugins this option can improve hud load time.")]
-    public ToggleNode MultiThreadLoadPlugins
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode MultiThreadLoadPlugins { get; set; } = new();
 
     [Menu("Avoid locking plugin dlls", "Requires restart to apply. Only enable this if you need to do live dll replacement without restarting the HUD.")]
-    public ToggleNode AvoidLockingDllFiles
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode AvoidLockingDllFiles { get; set; } = new();
 
     [Menu(null, "Requires restart to apply. Load plugins from source even if there is a compiled plugin with the same name")]
-    public ToggleNode PreferSourcePlugins
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode PreferSourcePlugins { get; set; } = new();
 
     [Menu(null, "Start one build using a graph with all plugins included. Decreases total build time")]
     [JsonProperty("BuildAllPluginsAtOnce_v2")]
-    public ToggleNode BuildAllPluginsAtOnce
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode CachePluginCompilationResults
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode BuildAllPluginsAtOnce { get; set; } = new();
+    public ToggleNode CachePluginCompilationResults { get; set; } = new();
 
     [Menu(null, "You probably don't want to enable this")]
-    public ToggleNode IgnoreReferenceChangesForCompilationCache
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode IgnoreReferenceChangesForCompilationCache { get; set; } = new();
 
     [JsonIgnore]
-    public ButtonNode ResetCompilationCache
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ButtonNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public PluginFolderSettings FolderSettings
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (PluginFolderSettings)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public PluginNotificationSettings NotificationSettings
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (PluginNotificationSettings)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ButtonNode ResetCompilationCache { get; set; } = new();
+    public PluginFolderSettings FolderSettings { get; set; }
+    public PluginNotificationSettings NotificationSettings { get; set; }
 
     public CorePluginSettings()
     {

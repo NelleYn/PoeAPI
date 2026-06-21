@@ -17,77 +17,15 @@ public class SnapshotSettings
     }
 
     [JsonIgnore]
-    public ButtonNode TakeSnapshot
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ButtonNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ButtonNode TakeSnapshot { get; set; } = new();
 
     [JsonIgnore]
-    public ButtonNode ClearSnapshots
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ButtonNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public HotkeyNodeV2 TakeSnapshotHotkey
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (HotkeyNodeV2)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode FreezeProcessDuringSnapshot
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ButtonNode ClearSnapshots { get; set; } = new();
+    public HotkeyNodeV2 TakeSnapshotHotkey { get; set; }
+    public ToggleNode FreezeProcessDuringSnapshot { get; set; } = new();
 
     [JsonIgnore]
-    public RenderList SnapshotList
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (RenderList)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public RenderList SnapshotList { get; set; }
 
     public SnapshotSettings()
     {

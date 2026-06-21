@@ -32,20 +32,7 @@ public class StringPattern : IPattern
         }
     }
 
-    public int StartOffset
-    {
-        [CompilerGenerated]
-        get
-        {
-            //IL_0002: Expected I4, but got O
-            return (int)this;
-        }
-
-        [CompilerGenerated]
-        init
-        {
-        }
-    }
+    public int StartOffset { get; init; }
 
     public int PatternOffset
     {

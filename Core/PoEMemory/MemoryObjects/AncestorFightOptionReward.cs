@@ -6,75 +6,10 @@ using ExileCore.PoEMemory.FilesInMemory.Ancestor;
 namespace ExileCore.PoEMemory.MemoryObjects;
 public record AncestorFightOptionReward
 {
-    [CompilerGenerated]
-    protected virtual Type EqualityContract
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (Type)typeof(AncestorFightOptionReward).TypeHandle;
-        }
-    }
-
-    public AncestralTrialTribe FavorTribe
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (AncestralTrialTribe)(object)this;
-        }
-
-        [CompilerGenerated]
-        init
-        {
-        }
-    }
-
-    public int FavorAmount
-    {
-        [CompilerGenerated]
-        get
-        {
-            //IL_0002: Expected I4, but got O
-            return (int)this;
-        }
-
-        [CompilerGenerated]
-        init
-        {
-        }
-    }
+    public AncestralTrialTribe FavorTribe { get; init; }
+    public int FavorAmount { get; init; }
 
     public AncestorFightOptionReward(AncestralTrialTribe FavorTribe, int FavorAmount)
-    {
-    }
-
-    [CompilerGenerated]
-    public override string ToString()
-    {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-    }
-
-    [CompilerGenerated]
-    protected virtual bool PrintMembers(StringBuilder builder)
-    {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-    }
-
-    [CompilerGenerated]
-    public override int GetHashCode()
-    {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-    }
-
-    [CompilerGenerated]
-    public virtual bool Equals(AncestorFightOptionReward? other)
-    {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-    }
-
-    [CompilerGenerated]
-    protected AncestorFightOptionReward(AncestorFightOptionReward original)
     {
     }
 

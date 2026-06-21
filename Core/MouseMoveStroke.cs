@@ -16,19 +16,7 @@ public sealed record MouseMoveStroke
         }
     }
 
-    public List<MouseMoveStrokePoint> Points
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (List<MouseMoveStrokePoint>)(object)this;
-        }
-
-        [CompilerGenerated]
-        init
-        {
-        }
-    }
+    public List<MouseMoveStrokePoint> Points { get; init; }
 
     public MouseMoveStroke(List<MouseMoveStrokePoint> Points)
     {

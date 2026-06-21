@@ -19,34 +19,8 @@ partial class Graphics
             }
         }
 
-        public ImGuiRender Render
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ImGuiRender)(object)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public float OldScale
-        {
-            [CompilerGenerated]
-            get
-            {
-                //IL_0002: Expected F4, but got O
-                return (float)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
+        public ImGuiRender Render { get; init; }
+        public float OldScale { get; init; }
 
         public SetTextScaleDisposable(ImGuiRender Render, float OldScale)
         {

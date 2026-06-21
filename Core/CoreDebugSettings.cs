@@ -6,103 +6,13 @@ namespace ExileCore;
 [Submenu(CollapsedByDefault = true)]
 public class CoreDebugSettings
 {
-    public ToggleNode ShowDemoWindow
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode HideAllDebugging
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode DebugFileLoads
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode DebugDatLoads
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode BypassLoginRequirement
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode AttachToFirstFreeProcess
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode DetectOtherLoaderProcesses
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode ShowDemoWindow { get; set; } = new();
+    public ToggleNode HideAllDebugging { get; set; } = new();
+    public ToggleNode DebugFileLoads { get; set; } = new();
+    public ToggleNode DebugDatLoads { get; set; } = new();
+    public ToggleNode BypassLoginRequirement { get; set; } = new();
+    public ToggleNode AttachToFirstFreeProcess { get; set; } = new();
+    public ToggleNode DetectOtherLoaderProcesses { get; set; } = new();
 
     public CoreDebugSettings()
     {

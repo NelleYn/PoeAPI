@@ -7,150 +7,26 @@ namespace ExileCore;
 [Submenu]
 public class CorePerformanceSettings
 {
-    public ToggleNode CoroutineMultiThreading
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ToggleNode ParseEntitiesInMultiThread
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode CoroutineMultiThreading { get; set; } = new();
+    public ToggleNode ParseEntitiesInMultiThread { get; set; } = new();
 
     [Menu("Threads count", "How much threads to use for prepare work.")]
-    public RangeNode<int> Threads
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (RangeNode<int>)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public RangeNode<int> Threads { get; set; } = new();
 
     [Menu("Target FPS")]
-    public RangeNode<int> TargetFps
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (RangeNode<int>)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public RangeNode<int> TargetParallelCoroutineFps
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (RangeNode<int>)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public RangeNode<int> TargetFps { get; set; } = new();
+    public RangeNode<int> TargetParallelCoroutineFps { get; set; } = new();
 
     [Menu(null, "How often to update entities. You can see time spent on this in DebugWindow->Coroutines.")]
-    public RangeNode<int> EntitiesFps
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (RangeNode<int>)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public RangeNode<int> EntitiesFps { get; set; } = new();
 
     [JsonProperty("ParseServerEntities_v2")]
-    public ToggleNode ParseServerEntities
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode ParseServerEntities { get; set; } = new();
 
     [Menu("Limit draw plot in ms", "Don't put small value, because plot need a lot triangles and DebugWindow with a lot plot will be broke.")]
-    public RangeNode<float> LimitDrawPlot
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (RangeNode<float>)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public RangeNode<int> MaxGroundItemLabels
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (RangeNode<int>)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public RangeNode<int> MaxEntities
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (RangeNode<int>)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public RangeNode<float> LimitDrawPlot { get; set; } = new();
+    public RangeNode<int> MaxGroundItemLabels { get; set; } = new();
+    public RangeNode<int> MaxEntities { get; set; } = new();
 
     public CorePerformanceSettings()
     {

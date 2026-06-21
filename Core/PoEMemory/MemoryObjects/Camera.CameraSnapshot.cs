@@ -19,33 +19,8 @@ partial class Camera
             }
         }
 
-        public Matrix4x4 Matrix
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (Matrix4x4)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
-
-        public Vector2 HalfSize
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (Vector2)this;
-            }
-
-            [CompilerGenerated]
-            init
-            {
-            }
-        }
+        public Matrix4x4 Matrix { get; init; }
+        public Vector2 HalfSize { get; init; }
 
         public CameraSnapshot(Matrix4x4 Matrix, Vector2 HalfSize)
         {

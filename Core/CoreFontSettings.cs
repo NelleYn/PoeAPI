@@ -10,33 +10,8 @@ public class CoreFontSettings
 {
     public class CoreFontEntrySetting
     {
-        public ListNode Font
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ListNode)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
-
-        public ContentNode<RangeNode<int>> Sizes
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (ContentNode<RangeNode<int>>)(object)this;
-            }
-
-            [CompilerGenerated]
-            set
-            {
-            }
-        }
+        public ListNode Font { get; set; } = new();
+        public ContentNode<RangeNode<int>> Sizes { get; set; } = new();
 
         public override string ToString()
         {
@@ -50,77 +25,15 @@ public class CoreFontSettings
     }
 
     internal readonly List<string> AllowedFonts;
-    public ContentNode<CoreFontEntrySetting> Fonts
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ContentNode<CoreFontEntrySetting>)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ListNode MainFont
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ListNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
-
-    public ListNode FontGlyphRange
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ListNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ContentNode<CoreFontEntrySetting> Fonts { get; set; } = new();
+    public ListNode MainFont { get; set; } = new();
+    public ListNode FontGlyphRange { get; set; } = new();
 
     [Menu(null, "If unchecked, some plugin may ignore the selected font")]
-    public ToggleNode ApplySelectedFontGlobally
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ToggleNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ToggleNode ApplySelectedFontGlobally { get; set; } = new();
 
     [JsonIgnore]
-    public ButtonNode Apply
-    {
-        [CompilerGenerated]
-        get
-        {
-            return (ButtonNode)(object)this;
-        }
-
-        [CompilerGenerated]
-        set
-        {
-        }
-    }
+    public ButtonNode Apply { get; set; } = new();
 
     public unsafe CoreFontSettings()
     {

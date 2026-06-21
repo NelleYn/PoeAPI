@@ -171,3 +171,27 @@ Their getters read specific process-memory offsets that the protection hides —
 - `Core/PoEMemory/Elements/Necropolis/NecropolisMonsterPanel.cs`
 - `Core/PoEMemory/Elements/NpcDialog.cs`
 - … and 147 more
+
+## Progress update
+
+**Offsets are also protected.** `GameOffsets.dll` decompiles cleanly (its code isn't
+anti-tampered), but every `FieldLayout` offset is obfuscated in metadata (values in the
+`0x7F00_0000` band, impossible for the declared struct sizes) and is only patched to the
+real value at runtime by ExileCore's protector. So the field offsets — like the method
+bodies — exist only inside the live process. de4dot, AntiTamperKiller, dnSpyEx *Save
+Module*, and ExtremeDumper were all tried and could not recover them.
+
+**Category-A work done (no offsets needed):**
+- `StructuredRemoteMemoryObject<T>` base implemented (per-frame struct cache).
+- `DisposableAction`, `Memory.EmptyDisposable`, `Memory.BooleanHolder` implemented.
+- 131 mangled auto-properties restored across 29 settings/POCO files (`{ get; set; }`,
+  node-typed props initialized with `= new()`).
+- 8 records cleaned: synthesized value-semantics members stripped so the compiler
+  regenerates them; `DebugMessage` ctor/Deconstruct fixed.
+
+**Still open:**
+- Complex category-A (compilers, memory backends, async/task infra, ImGui helpers) — left
+  as `// TODO` (their algorithms aren't safely derivable from signatures).
+- 207 memory-backed types — blocked on real offsets. The lightest way to get them is an
+  **in-process `Marshal.OffsetOf` dump** (a tiny ExileApi plugin run once), which would
+  unlock the `Structure.Field` getters.
