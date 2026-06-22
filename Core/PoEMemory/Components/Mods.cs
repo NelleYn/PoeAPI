@@ -78,17 +78,21 @@ public partial class Mods : Component
     /// <summary>Gets the parsed item stats for this item.</summary>
     public ItemStats ItemStats => new ItemStats(Owner);
 
-    /// <summary>Gets the human-readable list of all item stats.</summary>
-    public List<string> HumanStats => GetStats(ModsStruct.GetStats);
+    /// <summary>Gets the human-readable stat arrays, reached via the mods-component stats pointer (328.8).</summary>
+    private ModsComponentStatsOffsets StatsStruct =>
+        ModsStruct.ModsComponentStatsPtr != 0 ? M.Read<ModsComponentStatsOffsets>(ModsStruct.ModsComponentStatsPtr) : default;
+
+    /// <summary>Gets the human-readable list of all (explicit) item stats.</summary>
+    public List<string> HumanStats => GetStats(StatsStruct.ExplicitStatsArray);
 
     /// <summary>Gets the human-readable list of crafted stats.</summary>
-    public List<string> HumanCraftedStats => GetStats(ModsStruct.GetCraftedStats);
+    public List<string> HumanCraftedStats => GetStats(StatsStruct.CraftedStatsArray);
 
     /// <summary>Gets the human-readable list of implicit stats.</summary>
-    public List<string> HumanImpStats => GetStats(ModsStruct.GetImplicitStats);
+    public List<string> HumanImpStats => GetStats(StatsStruct.ImplicitStatsArray);
 
     /// <summary>Gets the human-readable list of fractured stats.</summary>
-    public List<string> FracturedStats => GetStats(ModsStruct.GetFracturedStats);
+    public List<string> FracturedStats => GetStats(StatsStruct.FracturedStatsArray);
 
     private List<string> GetStats(NativePtrArray array)
     {
