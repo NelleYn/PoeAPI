@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using SharpDX;
 
 namespace GameOffsets;
@@ -6,25 +6,28 @@ namespace GameOffsets;
 /// <summary>
 /// Maps the in-game camera: viewport dimensions, far clip plane, world position
 /// and the view/projection matrix used to translate world coordinates to screen
-/// space.
+/// space. Verified against client 328.8 via an in-process Marshal.OffsetOf dump.
 /// </summary>
+/// <remarks>
+/// In 328.8 these values live in a nested CameraOffsetsInner at 0xA8; they are flattened
+/// here at absolute offsets (0xA8 + inner offset) so the camera projection code is unchanged.
+/// System.Numerics.Matrix4x4/Vector3 are read as the layout-identical SharpDX.Matrix/Vector3.
+/// </remarks>
 [StructLayout(LayoutKind.Explicit, Pack = 1)]
 public struct CameraOffsets
 {
-    /// <summary>Viewport width in pixels.</summary>
-    [FieldOffset(0x4)] public int Width;
-
-    /// <summary>Viewport height in pixels.</summary>
-    [FieldOffset(0x8)] public int Height;
-
-    /// <summary>Far clipping plane distance.</summary>
-    [FieldOffset(0x1C8)] public float ZFar;
+    /// <summary>Camera view/projection matrix used for world-to-screen projection.</summary>
+    [FieldOffset(0x1A8)] public Matrix MatrixBytes;
 
     /// <summary>Camera world position.</summary>
-    [FieldOffset(0xD4)] public Vector3 Position;
+    [FieldOffset(0x21C)] public Vector3 Position;
 
-    /// <summary>Camera view/projection matrix used for world-to-screen projection.</summary>
-    //First value is changing when we change the screen size (ratio)
-    //4 bytes before the matrix doesn't change
-    [FieldOffset(0x7C)] public Matrix MatrixBytes;
+    /// <summary>Far clipping plane distance.</summary>
+    [FieldOffset(0x2BC)] public float ZFar;
+
+    /// <summary>Viewport width in pixels.</summary>
+    [FieldOffset(0x318)] public int Width;
+
+    /// <summary>Viewport height in pixels.</summary>
+    [FieldOffset(0x31C)] public int Height;
 }
