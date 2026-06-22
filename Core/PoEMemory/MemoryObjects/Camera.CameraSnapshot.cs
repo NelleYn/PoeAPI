@@ -1,70 +1,23 @@
 // Partial extension that restores a nested type missing from the modernized source.
-using System;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace ExileCore.PoEMemory.MemoryObjects;
+
 partial class Camera
 {
-    public sealed record CameraSnapshot
+    /// <summary>
+    /// An immutable snapshot of the camera's view/projection matrix and half-viewport size,
+    /// usable for thread-safe world-to-screen projection independent of the live camera.
+    /// </summary>
+    public sealed record CameraSnapshot(Matrix4x4 Matrix, Vector2 HalfSize)
     {
-        [CompilerGenerated]
-        private Type EqualityContract
-        {
-            [CompilerGenerated]
-            get
-            {
-                return (Type)typeof(CameraSnapshot).TypeHandle;
-            }
-        }
-
-        public Matrix4x4 Matrix { get; init; }
-        public Vector2 HalfSize { get; init; }
-
-        public CameraSnapshot(Matrix4x4 Matrix, Vector2 HalfSize)
-        {
-        }
-
+        /// <summary>Projects a world-space position to screen-space pixels using this snapshot.</summary>
         public Vector2 WorldToScreen(Vector3 vec)
         {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        public override string ToString()
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        private bool PrintMembers(StringBuilder builder)
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        public override int GetHashCode()
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        public bool Equals(CameraSnapshot? other)
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-
-        [CompilerGenerated]
-        private CameraSnapshot(CameraSnapshot original)
-        {
-        }
-
-        [CompilerGenerated]
-        public void Deconstruct(out Matrix4x4 Matrix, out Vector2 HalfSize)
-        {
-            Matrix = (Matrix4x4)this;
-            HalfSize = (Vector2)this;
+            var cord = new Vector4(vec, 1.0f);
+            cord = Vector4.Transform(cord, Matrix);
+            cord /= cord.W;
+            return new Vector2((cord.X + 1.0f) * HalfSize.X, (1.0f - cord.Y) * HalfSize.Y);
         }
     }
 }
