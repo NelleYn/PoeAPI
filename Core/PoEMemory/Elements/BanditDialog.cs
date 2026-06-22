@@ -1,26 +1,28 @@
+using System;
+
 namespace ExileCore.PoEMemory.Elements;
+
 public class BanditDialog : Element
 {
-    public Element HelpButton
-    {
-        get
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-    }
+    public Element HelpButton => GetChildAtIndex(2)?.GetChildAtIndex(0);
+    public Element KillButton => GetChildAtIndex(2)?.GetChildAtIndex(1);
 
-    public Element KillButton
-    {
-        get
-        {
-            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-        }
-    }
-
-    public BanditType BanditType => (BanditType)this;
+    public BanditType BanditType => GetBanditType();
 
     private BanditType GetBanditType()
     {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
+        if (HelpButton == null)
+        {
+            DebugWindow.LogError("BanditDialog.HelpButton is null, either window is not open or check offsets");
+        }
+
+        var helpButtonText = HelpButton?.GetChildAtIndex(0)?.Text?.ToLower();
+        if (helpButtonText == null) throw new ArgumentException();
+
+        if (helpButtonText.Contains("kraityn")) return BanditType.Kraityn;
+        if (helpButtonText.Contains("alira")) return BanditType.Alira;
+        if (helpButtonText.Contains("oak")) return BanditType.Oak;
+
+        throw new ArgumentException();
     }
 }
