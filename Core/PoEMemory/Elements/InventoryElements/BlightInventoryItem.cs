@@ -8,6 +8,7 @@ public class BlightInventoryItem : NormalInventoryItem
 
     public override RectangleF GetClientRect()
     {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
+        // Fixed-position inventory tab: item rect is the parent slot rect (matches CurrencyInventoryItem).
+        return Parent.GetClientRect();
     }
 }
