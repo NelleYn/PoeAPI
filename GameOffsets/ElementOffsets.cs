@@ -13,6 +13,13 @@ namespace GameOffsets;
 [StructLayout(LayoutKind.Explicit, Pack = 1)]
 public struct ElementOffsets
 {
+    /// <summary>
+    /// Historical padding constant used by some derived UI element layouts (e.g. the map
+    /// elements in MapElement.cs). UNVERIFIED for 328.8 - the in-process dump does not cover
+    /// those repo-specific structs, so this carries over the previous value.
+    /// </summary>
+    public const int OffsetBuffers = 0x6EC;
+
     /// <summary>Pointer to this element itself; useful as a validity check.</summary>
     [FieldOffset(0xB0)] public long SelfPointer;
 
