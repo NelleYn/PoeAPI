@@ -7,17 +7,19 @@ namespace ExileCore.PoEMemory.MemoryObjects
 {
     public class ActorSkill : RemoteMemoryObject
     {
-        public ushort Id => M.Read<ushort>(Address + 0x10);
-        public GrantedEffectsPerLevel EffectsPerLevel => ReadObject<GrantedEffectsPerLevel>(Address + 0x20);
-        public bool CanBeUsedWithWeapon => M.Read<byte>(Address + 0x46) > 0;
-        public bool CanBeUsed => M.Read<byte>(Address + 0x47) == 0;
-        public int Cost => M.Read<byte>(Address + 0x4C);
+        // Offsets verified against client 328.8 via an in-process Marshal.OffsetOf dump. The skill
+        // data lives in a SubData block at +0x10 (ActorSkillOffsets.SubData / SubActorSkillOffsets),
+        // so each value below is 0x10 + its SubActorSkillOffsets offset. Cost is not in the dump.
+        public ushort Id => M.Read<ushort>(Address + 0x50);
+        public GrantedEffectsPerLevel EffectsPerLevel => ReadObject<GrantedEffectsPerLevel>(Address + 0x58);
+        public bool CanBeUsedWithWeapon => M.Read<byte>(Address + 0xC0) > 0;
+        public bool CanBeUsed => M.Read<byte>(Address + 0xC1) == 0;
+        public int Cost => M.Read<byte>(Address + 0x4C); // UNVERIFIED for 328.8 (not in dump)
 
-        //public int Unknown_Old_MaxUses => M.Read<int>(Address + 0x4c);
-        public int TotalUses => M.Read<int>(Address + 0x50);
-        public float Cooldown => M.Read<int>(Address + 0x58) / 100f; //Converted milliseconds to seconds
-        public int SoulsPerUse => M.Read<int>(Address + 0x68);
-        public int TotalVaalUses => M.Read<int>(Address + 0x6c);
+        public int TotalUses => M.Read<int>(Address + 0xC4);
+        public float Cooldown => M.Read<int>(Address + 0xD8) / 100f; //Converted milliseconds to seconds
+        public int SoulsPerUse => M.Read<int>(Address + 0xF8);
+        public int TotalVaalUses => M.Read<int>(Address + 0xFC);
         public bool IsOnSkillBar => SkillSlotIndex != -1;
         public int SkillSlotIndex => TheGame.IngameState.ServerData.SkillBarIds.IndexOf(Id);
 
