@@ -17,7 +17,7 @@ public struct CursorOffsets
     [FieldOffset(0x0)] public int vTable;
 
     /// <summary>Current cursor action identifier.</summary>
-    [FieldOffset(0x578)] public int Action;
+    [FieldOffset(0x578)] public byte Action;
 
     /// <summary>Number of clicks registered.</summary>
     [FieldOffset(0x2CC)] public int Clicks;
