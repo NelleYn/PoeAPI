@@ -1,78 +1,32 @@
+using System;
 using System.Collections.Generic;
 using ExileCore.PoEMemory.FilesInMemory;
 
 namespace ExileCore.PoEMemory.MemoryObjects.Heist;
+
 public class HeistNpcRecord : RemoteMemoryObject
 {
-    private long _JobCount
+    private long _StatCount => Math.Max(0, Math.Min(32, M.Read<long>(Address + 0x38)));
+
+    public string PortraitFile => M.ReadStringU(M.Read<long>(Address + 0x30));
+    public string Name => M.ReadStringU(M.Read<long>(Address + 0x6C));
+    public List<StatsDat.StatRecord> Stats => GetStats(M.Read<long>(Address + 0x40));
+
+    // Offset 0x28 is correct, but TheGame.Files.HeistJobs is not present in this fork — returns empty. Verify.
+    public List<HeistJobRecord> Jobs => new List<HeistJobRecord>();
+
+    private List<StatsDat.StatRecord> GetStats(long source)
     {
-        get
+        var stats = new List<StatsDat.StatRecord>();
+        if (source == 0) return stats;
+
+        for (var i = 0; i < _StatCount; ++i, source += 0x10)
         {
-            //IL_000a: Unknown result type (might be due to invalid IL or missing references)
-            //IL_000c: Expected I8, but got Unknown
-            _ = 0;
-            _ = 10;
-            return this + 32;
+            stats.Add(TheGame.Files.Stats.GetStatByAddress(M.Read<long>(source, 0x0)));
         }
+
+        return stats;
     }
 
-    public List<HeistJobRecord> Jobs => (List<HeistJobRecord>)(this + 40);
-
-    public string PortraitFile
-    {
-        get
-        {
-            //IL_0006: Unknown result type (might be due to invalid IL or missing references)
-            //IL_0009: Expected O, but got I4
-            _ = this + 48;
-            return (string)1;
-        }
-    }
-
-    private int _StatCount
-    {
-        get
-        {
-            //IL_0005: Unknown result type (might be due to invalid IL or missing references)
-            _ = this + 56;
-            _ = 0;
-            return 32;
-        }
-    }
-
-    public List<StatsDat.StatRecord> Stats
-    {
-        get
-        {
-            //IL_0006: Unknown result type (might be due to invalid IL or missing references)
-            _ = this + 64;
-            return (List<StatsDat.StatRecord>)(object)this;
-        }
-    }
-
-    public string Name
-    {
-        get
-        {
-            //IL_0006: Unknown result type (might be due to invalid IL or missing references)
-            //IL_0009: Expected O, but got I4
-            _ = this + 108;
-            return (string)1;
-        }
-    }
-
-    private List<StatsDat.StatRecord> GetStats(long start, int count)
-    {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-    }
-
-    private List<HeistJobRecord> GetJobs(long source)
-    {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-    }
-
-    public override string ToString()
-    {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-    }
+    public override string ToString() => Name;
 }

@@ -1,62 +1,18 @@
 namespace ExileCore.PoEMemory.MemoryObjects.Heist;
+
 public class HeistChestRewardTypeRecord : RemoteMemoryObject
 {
-    public string Id => (string)1;
+    public string Id => M.ReadStringU(M.Read<long>(Address));
+    public string Art => M.ReadStringU(M.Read<long>(Address + 0x08));
+    public string Name => M.ReadStringU(M.Read<long>(Address + 0x10));
+    public int MinimumDropLevel => M.Read<int>(Address + 0x28);
+    public int MaximumDropLevel => M.Read<int>(Address + 0x2C);
+    public int Weight => M.Read<int>(Address + 0x30);
+    public string RoomName => M.ReadStringU(M.Read<long>(Address + 0x34));
+    public int RequiredJobLevel => M.Read<int>(Address + 0x3C);
 
-    public string Art
-    {
-        get
-        {
-            //IL_0005: Unknown result type (might be due to invalid IL or missing references)
-            //IL_0008: Expected O, but got I4
-            _ = this + 8;
-            return (string)1;
-        }
-    }
+    // Offset 0x44 is correct, but TheGame.Files.HeistJobs is not present in this fork — returns null. Verify.
+    public HeistJobRecord RequiredJob => null;
 
-    public string Name
-    {
-        get
-        {
-            //IL_0006: Unknown result type (might be due to invalid IL or missing references)
-            //IL_0009: Expected O, but got I4
-            _ = this + 16;
-            return (string)1;
-        }
-    }
-
-    public int MinimumDropLevel => this + 40;
-    public int MaximumDropLevel => this + 44;
-    public int Weight => this + 48;
-
-    public string RoomName
-    {
-        get
-        {
-            //IL_0006: Unknown result type (might be due to invalid IL or missing references)
-            //IL_0009: Expected O, but got I4
-            _ = this + 52;
-            return (string)1;
-        }
-    }
-
-    public int RequiredJobLevel => this + 60;
-
-    public HeistJobRecord RequiredJob
-    {
-        get
-        {
-            //IL_0006: Unknown result type (might be due to invalid IL or missing references)
-            _ = this + 68;
-            return (HeistJobRecord)(object)new int[1]
-            {
-                8
-            };
-        }
-    }
-
-    public override string ToString()
-    {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
-    }
+    public override string ToString() => Name;
 }
