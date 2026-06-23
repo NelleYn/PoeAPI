@@ -212,12 +212,14 @@ fork* column names the in‑repo equivalent (file cited where non‑obvious).
 | --- | --- | --- | --- |
 | `Chest.Rarity` | — | missing | `Core/PoEMemory/Components/Chest.cs` exposes `IsOpened/IsLocked/IsStrongbox/IsLarge/…`; no `Rarity`. Use `Entity.Rarity` / `ObjectMagicProperties.Rarity`. |
 | `Transitionable.CurrentState` | `Flag1` / `Flag2` (`byte`) | renamed/signature‑diff | `Core/PoEMemory/Components/Transitionable.cs:9‑12`. Upstream `CurrentState`; here read `Flag1`. |
+| `Positioned.WorldPosNum` : `Vector2` (Numerics) | `Positioned.WorldPos` : SharpDX `Vector2` | missing | Same Numerics↔SharpDX split as `Entity.PosNum`. Fork: `Core/PoEMemory/Components/Positioned.cs:40` (also `GridPos`/`GridPosI`/`GridPosition`). |
 
 ### IngameState / IngameData / ServerData
 
 | Upstream path | This fork | Status | Notes |
 | --- | --- | --- | --- |
 | `IngameState.Data.ServerData` | `IngameState.ServerData` | renamed/moved | `IngameData` exposes **no** `ServerData` member in either tree. Fork: `Core/PoEMemory/MemoryObjects/IngameState.cs:70`. Plugin (old path): `Stashie/.../StashieSettingsHandler.cs:27`, `stashie/Stashie.cs:337`. |
+| `IngameState.UIHoverElement` | `IngameState.UIHover` : `Element` | renamed/missing | Used by ~5 plugins. Both trees expose `UIHover` (+`UIHoverTooltip`/`UIHoverX`/`UIHoverY`); the upstream distribution adds `UIHoverElement`. Fork: `Core/PoEMemory/MemoryObjects/IngameState.cs:73`. |
 
 ### UI Elements
 
