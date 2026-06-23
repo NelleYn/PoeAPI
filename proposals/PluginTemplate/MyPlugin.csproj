@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Starter plugin project for this ExileCore fork (.NET 10, Windows-only).
+    See proposals/PluginTemplate/README.md for placement and build instructions.
+
+    Source plugins live under Plugins/Source/<name>/ and are compiled at runtime by
+    the Roslyn-based PluginManager (no csproj is strictly required for that path).
+    This csproj is still useful for IDE IntelliSense and for the on-disk
+    `compile_MyPlugin` / `compile_plugins` console commands (which DO require a
+    *.csproj to exist in the plugin folder). See docs/plugin-compiler.md.
+  -->
+  <PropertyGroup>
+    <!-- Match the engine: net10.0-windows, x64, unsafe + WinForms enabled. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!--
+      Do NOT set OutputPath here when the plugin is built from Plugins/Source by the
+      engine: the host resolves the output for you. Set it only if you build manually.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Reference the engine assemblies from the host's output directory. For this fork the
+      build output folder is "PoeHelper" (see Core/Core.csproj <OutputPath>). Prefer an
+      environment variable (e.g. exapiPackage) pointing at that folder over a hard-coded
+      path so the project is portable. The assemblies are <Private>False</Private> because
+      the host already provides them at runtime — do not copy them next to the plugin.
+    -->
+    <Reference Include="ExileCore">
+      <HintPath>$(exapiPackage)\ExileCore.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="GameOffsets">
+      <HintPath>$(exapiPackage)\GameOffsets.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      SharpDX provides the Vector2/Vector3/Color types used by Camera/Entity and the
+      Graphics draw overloads in this fork. Newtonsoft.Json matches the engine's settings
+      serializer. These are <Private>False</Private>-equivalent in practice because the host
+      ships them; the references exist for compilation only. Versions mirror Core.csproj.
+    -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="SharpDX.Mathematics" Version="4.2.0" />
+  </ItemGroup>
+
+</Project>
