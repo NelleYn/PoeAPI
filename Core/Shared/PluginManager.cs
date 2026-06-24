@@ -15,7 +15,7 @@ using SharpDX;
 
 namespace ExileCore.Shared
 {
-    public class PluginManager
+    public partial class PluginManager
     {
         private const string PluginsDirectory = "Plugins";
         private const string CompiledPluginsDirectory = "Compiled";

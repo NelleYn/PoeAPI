@@ -21,7 +21,7 @@ public class DeployedObject : RemoteMemoryObject
     private ActorDeployedObject Struct => cacheValue.Value;
 
     /// <summary>Gets the entity id of the deployed object.</summary>
-    public ushort ObjectId => Struct.ObjectId;
+    public uint ObjectId => Struct.ObjectId;
 
     /// <summary>Gets the key of the skill that deployed this object.</summary>
     public ushort SkillKey => Struct.SkillId;

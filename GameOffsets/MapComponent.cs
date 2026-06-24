@@ -12,7 +12,7 @@ namespace GameOffsets
     [StructLayout(LayoutKind.Explicit, Pack = 1)]
     public struct MapComponentInner
     {
-        [FieldOffset(0x28)] public long Area;
-        [FieldOffset(0x9c)] public int MapSeries;
+        [FieldOffset(0x20)] public long Area;
+        [FieldOffset(0x58)] public int MapSeries;
     }
 }

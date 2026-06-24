@@ -12,11 +12,11 @@ public struct EntityOffsets
     /// <summary>The entity's object header (see <see cref="ObjectHeaderOffsets"/>).</summary>
     [FieldOffset(0x8)] public ObjectHeaderOffsets Head;
 
-    /// <summary>Pointer to the entity's component list.</summary>
+    /// <summary>Base of the entity's component pointer array (std::vector begin pointer).</summary>
     [FieldOffset(0x10)] public long ComponentList;
 
-    // [FieldOffset(0x40)] public uint Id;
-    //  [FieldOffset(0x58)] public uint InventoryId;
+    /// <summary>The entity id. Verified against client 328.8 (Marshal.OffsetOf dump).</summary>
+    [FieldOffset(0x88)] public uint Id;
 
     /// <inheritdoc/>
     public override string ToString()

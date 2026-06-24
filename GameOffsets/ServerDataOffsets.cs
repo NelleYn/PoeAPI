@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using GameOffsets.Native;
 
 namespace GameOffsets
@@ -52,7 +52,7 @@ namespace GameOffsets
         [FieldOffset(0x76A0 - Skip)] public long CompletedMaps;//search for a LONG value equals to your current amount of completed maps. Pointer will be under this offset
         [FieldOffset(0x7660 - Skip)] public long BonusCompletedAreas;
         [FieldOffset(0x7440 - Skip)] public long ElderInfluencedAreas;
-        [FieldOffset(0)] public long MasterAreas;
+        [FieldOffset(0x0)] public long MasterAreas;
         [FieldOffset(0x7660 - Skip)] public long ElderGuardiansAreas; //Maybe wrong not tested
         [FieldOffset(0x7660 - Skip)] public long ShapedAreas; //Maybe wrong not tested
         [FieldOffset(0x6E77 - Skip)] public ushort LastActionId;//Do we need this?

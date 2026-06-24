@@ -12,7 +12,7 @@ namespace ExileCore;
 /// image drawing through ImGui and the sprite renderer. Most methods are overloads accepting
 /// either SharpDX or System.Numerics vectors.
 /// </summary>
-public class Graphics
+public partial class Graphics
 {
     private static readonly RectangleF DefaultUV = new RectangleF(0, 0, 1, 1);
     private readonly CoreSettings _settings;

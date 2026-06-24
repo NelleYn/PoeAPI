@@ -41,7 +41,7 @@ public class Buff : RemoteMemoryObject
     public string Name => _name.Value;
 
     /// <summary>Gets the number of charges currently stacked on the buff.</summary>
-    public byte Charges => M.Read<byte>(Address + 44);
+    public byte Charges => (byte) BuffOffsets.Charges;
 
     //public int SkillId => M.Read<int>(Address + 0x5C); // I think this is part of another structure referenced in a pointer at 0x58
 

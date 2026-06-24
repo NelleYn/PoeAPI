@@ -6,7 +6,7 @@ namespace ExileCore.PoEMemory.Elements;
 /// <summary>
 /// UI element exposing the labels and items currently shown on the ground in the game world.
 /// </summary>
-public class ItemsOnGroundLabelElement : Element
+public partial class ItemsOnGroundLabelElement : Element
 {
     /// <summary>
     /// Gets the label element currently under the cursor, or <c>null</c> when none.

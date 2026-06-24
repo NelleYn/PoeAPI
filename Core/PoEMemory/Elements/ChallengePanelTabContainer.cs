@@ -1,0 +1,14 @@
+namespace ExileCore.PoEMemory.Elements;
+public class ChallengePanelTabContainer : Element
+{
+    private BestiaryTab _bestiaryTab;
+    public StashTabContainer ActualTabContainer => (StashTabContainer)(object)this;
+
+    public BestiaryTab BestiaryTab
+    {
+        get
+        {
+            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
+        }
+    }
+}

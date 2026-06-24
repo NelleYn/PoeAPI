@@ -10,5 +10,5 @@ namespace GameOffsets;
 public struct EntityLabelMapOffsets
 {
     /// <summary>Pointer to the entity-to-label map.</summary>
-    [FieldOffset(0x2A0)] public long EntityLabelMap;
+    [FieldOffset(0x2A8)] public long EntityLabelMap;
 }

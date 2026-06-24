@@ -34,18 +34,29 @@ public class Stats : Component
     /// <summary>Gets the parsed stat dictionary keyed by <see cref="GameStat"/>.</summary>
     public Dictionary<GameStat, int> StatDictionary => _statDictionary.Value;
 
+    /// <summary>Gets the contiguous (id, value) stat vector, reached via the sub-stats pointer (328.8).</summary>
+    private NativePtrArray StatsArray
+    {
+        get
+        {
+            var subPtr = StatsComponent.SubStatsPtr;
+            return subPtr == 0 ? default : M.Read<SubStatsComponentOffsets>(subPtr).Stats;
+        }
+    }
+
     /// <summary>Gets the number of stats on the entity.</summary>
-    public long StatsCount => (StatsComponent.Stats.Last - StatsComponent.Stats.First) / 8;
+    public long StatsCount => (StatsArray.Last - StatsArray.First) / 8;
 
     /// <summary>Reads and parses the entity's stats from memory.</summary>
     public Dictionary<GameStat, int> ParseStats()
     {
         if (Address == 0) return testStatDictionary;
 
-        var statPtrStart = StatsComponent.Stats.First;
-        var statPtrLast = StatsComponent.Stats.Last;
-        var statPtrEnd = StatsComponent.Stats.End;
-        if (StatsComponent.Stats.Size <= 0) return testStatDictionary;
+        var statsVec = StatsArray;
+        var statPtrStart = statsVec.First;
+        var statPtrLast = statsVec.Last;
+        var statPtrEnd = statsVec.End;
+        if (statsVec.Size <= 0) return testStatDictionary;
         var key = 0;
         var value = 0;
         var total_stats = statPtrLast - statPtrStart;
@@ -57,7 +68,7 @@ public class Stats : Component
         if (max_stats > 9000)
         {
             Core.Logger.Error(
-                $"Stats over capped: {StatsComponent.Stats} Total Stats: {total_stats} Max Stats: {max_stats}");
+                $"Stats over capped: {statsVec} Total Stats: {total_stats} Max Stats: {max_stats}");
 
             return testStatDictionary;
         }

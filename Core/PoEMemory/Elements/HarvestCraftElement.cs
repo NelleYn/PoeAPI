@@ -1,0 +1,19 @@
+using System.Text.RegularExpressions;
+
+namespace ExileCore.PoEMemory.Elements;
+public class HarvestCraftElement : Element
+{
+    private static readonly Regex ReplaceRegex;
+    public string CraftDisplayName
+    {
+        get
+        {
+            throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
+        }
+    }
+
+    static HarvestCraftElement()
+    {
+        _ = 8;
+    }
+}

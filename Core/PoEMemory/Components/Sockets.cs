@@ -8,7 +8,7 @@ namespace ExileCore.PoEMemory.Components;
 /// <summary>
 /// Component exposing an item's sockets, links, socket colors, and socketed gems.
 /// </summary>
-public class Sockets : Component
+public partial class Sockets : Component
 {
     /// <summary>Gets the size of the largest link group on the item.</summary>
     public int LargestLinkSize

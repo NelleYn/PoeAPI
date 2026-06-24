@@ -122,7 +122,7 @@ public class Actor : Component
         public float DestinationY => Struct.Destination.Y;
 
         /// <summary>Gets the action destination.</summary>
-        public Vector2 Destination => Struct.Destination;
+        public Vector2 Destination => Struct.Destination.ToVector2();
 
         /// <summary>Gets the targeted entity of the action.</summary>
         public Entity Target => GetObject<Entity>(Struct.Target);

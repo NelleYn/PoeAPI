@@ -25,10 +25,10 @@ public class Positioned : Component
     public long OwnerAddress => PositionedStruct.OwnerAddress;
 
     /// <summary>Gets the X grid coordinate.</summary>
-    public int GridX => PositionedStruct.GridX;
+    public int GridX => PositionedStruct.GridPosition.X;
 
     /// <summary>Gets the Y grid coordinate.</summary>
-    public int GridY => PositionedStruct.GridY;
+    public int GridY => PositionedStruct.GridPosition.Y;
 
     /// <summary>Gets the grid position as a floating-point vector.</summary>
     public Vector2 GridPos => new(GridX, GridY);
@@ -40,16 +40,16 @@ public class Positioned : Component
     public Vector2 WorldPos => PositionedStruct.WorldPosition;
 
     /// <summary>Gets the sub-grid position.</summary>
-    public Vector2 GridPosition => PositionedStruct.GridPosition;
+    public Vector2 GridPosition => PositionedStruct.GridPosition.ToVector2();
 
     /// <summary>Gets the rotation, in radians.</summary>
     public float Rotation => PositionedStruct.Rotation;
 
     /// <summary>Gets the X world coordinate.</summary>
-    public float WorldX => PositionedStruct.WorldX;
+    public float WorldX => PositionedStruct.WorldPosition.X;
 
     /// <summary>Gets the Y world coordinate.</summary>
-    public float WorldY => PositionedStruct.WorldY;
+    public float WorldY => PositionedStruct.WorldPosition.Y;
 
     /// <summary>Gets the rotation, in degrees.</summary>
     public float RotationDeg => Rotation * (180 / MathUtil.Pi);

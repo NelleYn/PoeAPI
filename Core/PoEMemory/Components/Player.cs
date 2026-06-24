@@ -15,23 +15,26 @@ namespace ExileCore.PoEMemory.Components;
 /// </summary>
 public class Player : Component
 {
+    // Offsets verified against client 328.8 via an in-process Marshal.OffsetOf dump
+    // (PlayerName 0x168, Xp 0x18C, Attributes 0x19C, Level 0x1AC).
+
     /// <summary>Gets the player's character name.</summary>
-    public string PlayerName => NativeStringReader.ReadString(Address + 0x58, M);
+    public string PlayerName => NativeStringReader.ReadString(Address + 0x168, M);
 
     /// <summary>Gets the player's total experience.</summary>
-    public uint XP => Address != 0 ? M.Read<uint>(Address + 0x7C) : 0;
+    public uint XP => Address != 0 ? M.Read<uint>(Address + 0x18C) : 0;
 
     /// <summary>Gets the player's strength attribute.</summary>
-    public int Strength => Address != 0 ? M.Read<int>(Address + 0x80) : 0;
+    public int Strength => Address != 0 ? M.Read<int>(Address + 0x19C) : 0;
 
     /// <summary>Gets the player's dexterity attribute.</summary>
-    public int Dexterity => Address != 0 ? M.Read<int>(Address + 0x84) : 0;
+    public int Dexterity => Address != 0 ? M.Read<int>(Address + 0x1A0) : 0;
 
     /// <summary>Gets the player's intelligence attribute.</summary>
-    public int Intelligence => Address != 0 ? M.Read<int>(Address + 0x88) : 0;
+    public int Intelligence => Address != 0 ? M.Read<int>(Address + 0x1A4) : 0;
 
     /// <summary>Gets the player's level.</summary>
-    public int Level => Address != 0 ? M.Read<byte>(Address + 0xA8) : 1;
+    public int Level => Address != 0 ? M.Read<byte>(Address + 0x1AC) : 1;
 
     /// <summary>Gets the allocated loot id of the player.</summary>
     public int AllocatedLootId => Address != 0 ? M.Read<byte>(Address + 0x7C) : 1;

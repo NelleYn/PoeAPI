@@ -8,7 +8,7 @@ namespace ExileCore.PoEMemory.Models;
 /// Maps the game's internal modifier names onto <see cref="ItemStatEnum"/> values and
 /// applies their numeric contributions to an <see cref="ItemStats"/> accumulator.
 /// </summary>
-public class StatTranslator
+public partial class StatTranslator
 {
     private readonly Dictionary<string, AddStat> mods;
 

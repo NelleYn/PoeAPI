@@ -370,11 +370,16 @@ namespace ExileCore.PoEMemory.MemoryObjects
                 if (_componentLookup != null)
                     return _componentLookup.Value;
 
+                // NOTE: this pointer chain to the component-name linked list is the one piece of
+                // the entity foundation that the 328.8 offset dump cannot verify (it is logic in
+                // the protected client, not a struct layout). The dump confirms ObjectHeader.
+                // ComponentLookUpPtr is at 0x28; if component lookup misbehaves in-game this chain
+                // (and the linked-list head offset) is the first thing to re-check.
                 return (long) (_componentLookup = M.Read<long>(Address + 0x8, 0x38, 0x30));
             }
         }
 
-        public uint Id => (uint) (_id = _id ?? M.Read<uint>(Address + 0x50));
+        public uint Id => (uint) (_id = _id ?? EntityOffsets.Id);
         public uint InventoryId => (uint) (_inventoryId = _inventoryId ?? M.Read<uint>(Address + 0x68));
 
         //public bool IsValid => M.Read<int>(EntityOffsets.Head.MainObject+0x18,0) == 0x65004D;

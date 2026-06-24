@@ -49,7 +49,8 @@ public class Element : RemoteMemoryObject
     public long ChildCount => (Elem.ChildEnd - Elem.ChildStart) / 8;
 
     /// <summary>Gets a value indicating whether this element is locally visible (ignoring ancestors).</summary>
-    public bool IsVisibleLocal => (Elem.IsVisibleLocal & 4) == 4;
+    /// <remarks>ElementFlags.IsVisibleLocal is 0x800, i.e. bit 0x08 of the byte at Flags+1 (328.8).</remarks>
+    public bool IsVisibleLocal => (Elem.IsVisibleLocal & 8) == 8;
 
     /// <summary>Gets the root element of the in-game UI tree.</summary>
     public Element Root => TheGame.IngameState.UIRoot;
@@ -79,7 +80,7 @@ public class Element : RemoteMemoryObject
     public float Height => Elem.Height;
 
     /// <summary>Gets a value indicating whether the element is currently highlighted.</summary>
-    public bool isHighlighted => Elem.isHighlighted;
+    public bool isHighlighted => Elem.isHighlighted != 0;
 
     /// <summary>Gets the element's text, with icon placeholders substituted, or <c>null</c> when empty.</summary>
     public virtual string Text
