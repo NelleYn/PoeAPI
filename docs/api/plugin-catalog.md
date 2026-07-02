@@ -228,16 +228,16 @@ cookbook recipe (produced by sibling workers; linked here by planned path).
 | Building block | Where it lives | What it gives you | Cookbook recipe |
 | --- | --- | --- | --- |
 | **IconsBuilder** + **MinimapIcons** | exApiTools/IconsBuilder (fork of TehCheat, archived); exApiTools/MinimapIcons | Constructs and renders entity icons on the minimap and large map; the standard way HUD plugins draw map markers | [cookbook/icons-and-minimap.md](cookbook/icons-and-minimap.md) |
-| **InputHumanizer** | exApiTools/InputHumanizer (fork of sychotixdev) | A shared input service that adds human-like delays/jitter to clicks and key presses; consumed by pickit/stash/vendor automation via `PluginBridge` | [cookbook/input-and-automation.md](cookbook/input-and-automation.md) |
-| **ItemFilterLibrary** | bundled in DetectiveSquirrel's `*WithLinq` plugins (no standalone repo confirmed at survey time) | A LINQ/expression query layer over item data; the basis of GroundItems/NPCInv/InvWithLinq and WheresMyCraftAt rule syntax | [cookbook/item-filter-library.md](cookbook/item-filter-library.md) |
-| **BaseTreeRoutine** | vendored inside PassiveSkillTreePlanter and legacy flask/aura bots | A reusable tick-driven state/"routine" base for input automation plugins | [cookbook/input-and-automation.md](cookbook/input-and-automation.md) |
-| **GameStatExporter** | exApiTools/GameStatExporter (fork of TehCheat) | Surfaces the player's `GameStat` values to other plugins/tools | [cookbook/reading-game-stats.md](cookbook/reading-game-stats.md) |
-| **PluginUpdater** | exApiTools/PluginUpdater (fork of exCore2) | Install/update plugins from GitHub URLs in-app; the distribution mechanism | [cookbook/distributing-plugins.md](cookbook/distributing-plugins.md) |
-| **PluginTemplate** | exApiTools/PluginTemplate | Minimal `BaseSettingsPlugin<TSettings>` skeleton to copy when starting | [cookbook/new-plugin-skeleton.md](cookbook/new-plugin-skeleton.md) |
-| **exApiWiki** | exApiTools/exApiWiki | The community how-to wiki; cross-reference for behaviors not in source | [cookbook/new-plugin-skeleton.md](cookbook/new-plugin-skeleton.md) |
-| **Radar (pathfinding)** | exApiTools/Radar (upstream instantsc/Radar) | Terrain-grid pathfinding + `Camera.WorldToScreen` line drawing — the canonical map/pathing example | [cookbook/pathfinding-and-terrain.md](cookbook/pathfinding-and-terrain.md) |
-| **ReAgent** | exApiTools/ReAgent | A general condition→action rules engine; reference for entity/buff/input glue | [cookbook/input-and-automation.md](cookbook/input-and-automation.md) |
-| **DevTree** | exApiTools/DevTree | Live memory-tree browser — the tool you use to discover offsets/components while developing | [cookbook/debugging-with-devtree.md](cookbook/debugging-with-devtree.md) |
+| **InputHumanizer** | exApiTools/InputHumanizer (fork of sychotixdev) | A shared input service that adds human-like delays/jitter to clicks and key presses; consumed by pickit/stash/vendor automation via `PluginBridge` | [cookbook/input-and-automation.md](cookbook/input-automation.md) |
+| **ItemFilterLibrary** | bundled in DetectiveSquirrel's `*WithLinq` plugins (no standalone repo confirmed at survey time) | A LINQ/expression query layer over item data; the basis of GroundItems/NPCInv/InvWithLinq and WheresMyCraftAt rule syntax | [cookbook/item-filter-library.md](cookbook/item-filtering.md) |
+| **BaseTreeRoutine** | vendored inside PassiveSkillTreePlanter and legacy flask/aura bots | A reusable tick-driven state/"routine" base for input automation plugins | [cookbook/input-and-automation.md](cookbook/input-automation.md) |
+| **GameStatExporter** | exApiTools/GameStatExporter (fork of TehCheat) | Surfaces the player's `GameStat` values to other plugins/tools | [cookbook/reading-game-stats.md](cookbook/dev-tooling.md) |
+| **PluginUpdater** | exApiTools/PluginUpdater (fork of exCore2) | Install/update plugins from GitHub URLs in-app; the distribution mechanism | [cookbook/distributing-plugins.md](cookbook/dev-tooling.md) |
+| **PluginTemplate** | exApiTools/PluginTemplate | Minimal `BaseSettingsPlugin<TSettings>` skeleton to copy when starting | [cookbook/new-plugin-skeleton.md](cookbook/from-exapi-wiki.md) |
+| **exApiWiki** | exApiTools/exApiWiki | The community how-to wiki; cross-reference for behaviors not in source | [cookbook/new-plugin-skeleton.md](cookbook/from-exapi-wiki.md) |
+| **Radar (pathfinding)** | exApiTools/Radar (upstream instantsc/Radar) | Terrain-grid pathfinding + `Camera.WorldToScreen` line drawing — the canonical map/pathing example | [cookbook/pathfinding-and-terrain.md](cookbook/pathfinding-movement.md) |
+| **ReAgent** | exApiTools/ReAgent | A general condition→action rules engine; reference for entity/buff/input glue | [cookbook/input-and-automation.md](cookbook/input-automation.md) |
+| **DevTree** | exApiTools/DevTree | Live memory-tree browser — the tool you use to discover offsets/components while developing | [cookbook/debugging-with-devtree.md](cookbook/dev-tooling.md) |
 
 ## Source
 
