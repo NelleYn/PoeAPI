@@ -75,6 +75,12 @@ public class IconsBuilderSettings : ISettings
     public ToggleNode HideOtherPlayers { get; set; } = new ToggleNode(false);
     public ToggleNode HideMinions { get; set; } = new ToggleNode(false);
     public ToggleNode HideBurriedMonsters { get; set; } = new ToggleNode(false);
+
+    /// <summary>When set, the Delirium-fog "avoid" volatile spawner shows its "Avoid" label.</summary>
+    public ToggleNode DeliriumText { get; set; } = new ToggleNode(false);
+
+    /// <summary>When set, Heist chests show a descriptive label derived from their path.</summary>
+    public ToggleNode HeistText { get; set; } = new ToggleNode(true);
     public ToggleNode ShowWhiteMonsterName { get; set; } = new ToggleNode(false);
     public ToggleNode ShowMagicMonsterName { get; set; } = new ToggleNode(false);
     public ToggleNode ShowRareMonsterName { get; set; } = new ToggleNode(false);
