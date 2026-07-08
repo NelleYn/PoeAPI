@@ -119,6 +119,17 @@ public class IconsBuilder : BaseSettingsPlugin<IconsBuilderSettings>
     }
 
     /// <summary>
+    /// Substitute for the original's <c>entity.League == LeagueType.Delirium</c> dispatch check (see
+    /// README): reads the <see cref="GameStat.AffectedByDelirium"/> stat the same way
+    /// <see cref="LegionIcon"/> already reads <see cref="GameStat.MonsterMinimapIcon"/>.
+    /// </summary>
+    private static bool IsAffectedByDelirium(Entity entity)
+    {
+        var stats = entity.Stats;
+        return stats != null && stats.TryGetValue(GameStat.AffectedByDelirium, out var affected) && affected != 0;
+    }
+
+    /// <summary>
     /// The core mapping: returns the icon that represents <paramref name="entity"/>, or null when the
     /// entity should have no icon. This is the reusable heart of the library.
     /// </summary>
@@ -145,6 +156,13 @@ public class IconsBuilder : BaseSettingsPlugin<IconsBuilderSettings>
 
             if (entity.League == LeagueType.Legion)
                 return new LegionIcon(entity, GameController, Settings, ModIcons);
+
+            // This fork's LeagueType has no Delirium member (see README), so Delirium monsters are
+            // recognised via the GameStat.AffectedByDelirium stat plus the Delirium-fog doodad-daemon
+            // path prefix instead of entity.League == LeagueType.Delirium.
+            if (IsAffectedByDelirium(entity) ||
+                entity.Path.StartsWith("Metadata/Monsters/LeagueAffliction/DoodadDaemons", StringComparison.Ordinal))
+                return new DeliriumIcon(entity, GameController, Settings, ModIcons);
 
             return new MonsterIcon(entity, GameController, Settings, ModIcons);
         }

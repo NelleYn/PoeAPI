@@ -18,9 +18,26 @@ namespace ExileCore.IconsBuilder;
 /// from its path/league, then picks a sprite, size, colour and label for that type.
 /// </summary>
 /// <remarks>
-/// The original library also handled Heist, Expedition and Sanctum chests. Those <c>ChestType</c>
-/// values do not exist in this fork's <see cref="ChestType"/> enum, so those branches are omitted
-/// (see README). Unclassified chests fall back to <see cref="ChestType.SmallChest"/>.
+/// The original library also handled Heist, Expedition and Sanctum chests via dedicated
+/// <c>ChestType.Heist</c>/<c>Expedition</c>/<c>Sanctum</c> values. None of those exist in this fork's
+/// <see cref="ChestType"/> enum (verified against <c>Core/Shared/Enums/ChestType.cs</c>), and the
+/// original's Expedition/Sanctum sprites (<c>MapIconsIndex.ExpeditionChest2</c>/<c>HeistPathChest</c>)
+/// don't exist in this fork's <see cref="MapIconsIndex"/> either — assigning them a numeric value here
+/// would mean guessing at an uncatalogued native game icon id, so those two remain out of scope (see
+/// README). Heist chests are detected via their path (no <c>LeagueType.Heist</c> needed) and rendered
+/// by reusing <see cref="ChestType.Strongbox"/>'s existing sprite/label logic rather than silently
+/// defaulting to <see cref="ChestType.SmallChest"/>. Any other unclassified chest still falls back to
+/// <see cref="ChestType.SmallChest"/>, which is the same "no more specific match" default the original
+/// library used.
+/// <para>
+/// Pre-existing behaviour that predates this change and applies equally to every <see cref="ChestType"/>
+/// case here, not just Heist: when the entity already carries an in-game <c>MinimapIcon</c> component
+/// (<c>_HasIngameIcon</c> is true), <see cref="Update"/> returns before reaching the <c>switch (CType)</c>
+/// block entirely, using the generic <c>Render</c> name instead. So a Heist chest that itself exposes an
+/// in-game minimap icon still won't get the <c>HeistText</c>-stripped label below — same limitation every
+/// other specialised chest type here already has. <see cref="CType"/> itself is still set correctly in
+/// that case (real classification data for callers), only the label/sprite customisation is skipped.
+/// </para>
 /// </remarks>
 public class ChestIcon : BaseIcon
 {
@@ -32,6 +49,13 @@ public class ChestIcon : BaseIcon
 
     /// <summary>The classified chest type.</summary>
     public ChestType CType { get; private set; }
+
+    /// <summary>
+    /// True when this chest was classified as <see cref="ChestType.Strongbox"/> because it's actually
+    /// a Heist chest reusing that rendering path (no <c>ChestType.Heist</c> in this fork; see class
+    /// remarks). Cached here so the <c>Strongbox</c> case doesn't need to re-run the path check.
+    /// </summary>
+    private bool _isHeistChest;
 
     private void Update(Entity entity, IconsBuilderSettings settings)
     {
@@ -51,6 +75,13 @@ public class ChestIcon : BaseIcon
             CType = ChestType.Perandus;
         else if (Entity.Path.Contains("Metadata/Chests/StrongBoxes"))
             CType = ChestType.Strongbox;
+        else if (Entity.Path.StartsWith("Metadata/Chests/LeagueHeist/HeistChest", StringComparison.Ordinal))
+        {
+            // No ChestType.Heist in this fork (see class remarks); reuse the Strongbox sprite/label
+            // path so Heist chests render as a real chest instead of falling back to SmallChest.
+            CType = ChestType.Strongbox;
+            _isHeistChest = true;
+        }
         else if (Entity.Path.Contains("Metadata/Chests/Labyrinth/Labyrinth"))
             CType = ChestType.Labyrinth;
         else if (Entity.Path.Contains("Metadata/Chests/SynthesisChests/Synthesis"))
@@ -177,7 +208,25 @@ public class ChestIcon : BaseIcon
                 else
                     MainTexture.UV = SpriteHelper.GetUV(MyMapIconsIndex.Strongbox);
 
-                Text = Entity.GetComponent<Render>()?.Name;
+                if (_isHeistChest)
+                {
+                    // Ported from the original's ChestType.Heist case (ExileCore.IconsBuilder README):
+                    // strip the generic path segments to leave just the distinguishing chest name.
+                    Text = settings.HeistText.Value
+                        ? Entity.Path
+                            .Replace("Metadata/Chests/LeagueHeist/HeistChest", "")
+                            .Replace("Thug", "")
+                            .Replace("Science", "")
+                            .Replace("Military", "")
+                            .Replace("Robot", "")
+                            .Replace("Secondary", "")
+                        : "";
+                }
+                else
+                {
+                    Text = Entity.GetComponent<Render>()?.Name;
+                }
+
                 break;
             case ChestType.SmallChest:
                 MainTexture.Size = settings.SizeSmallChestIcon;
