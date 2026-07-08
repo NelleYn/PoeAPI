@@ -1,5 +1,6 @@
 // EXPERIMENTAL candidate — see proposals/Compat/README.md. Not part of the build.
 
+using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Helpers;
@@ -125,5 +126,21 @@ public static class NumericsCompat
     public static NumVector3 RotationNum(this Render r)
     {
         return r.Rotation.ToVector3Num();
+    }
+
+    // ---- Element ---------------------------------------------------------------
+
+    /// <summary>
+    /// Emulates upstream <c>Element.PositionNum</c>: the UI element's position as <see cref="System.Numerics.Vector2"/>.
+    /// </summary>
+    /// <param name="e">The UI element.</param>
+    /// <returns>
+    /// The element position. Builds on the fork's <c>Element.Position</c>
+    /// (<c>Core/PoEMemory/Element.cs:61</c>), which is a plain SharpDX <see cref="SharpDX.Vector2"/>
+    /// (compatibility doc, "UI Elements").
+    /// </returns>
+    public static NumVector2 PositionNum(this Element e)
+    {
+        return e.Position.ToVector2Num();
     }
 }

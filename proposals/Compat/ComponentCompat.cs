@@ -2,13 +2,15 @@
 
 using System.Collections.Generic;
 using ExileCore.PoEMemory.Components;
+using ExileCore.PoEMemory.MemoryObjects;
 
 namespace ExileCore.Shared.Compat;
 
 /// <summary>
 /// Small per-component helpers that bridge fork member names to the shapes ExileApi-Compiled
 /// plugins expect: <c>Stack.MaxSize</c>, the 2-argument <c>SoundController.PlaySound(file, volume)</c>,
-/// and an upstream-style <c>Life.GetBuffs()</c> accessor.
+/// an upstream-style <c>Life.GetBuffs()</c> accessor, and the per-affix-category <c>Mods.ImplicitMods</c>
+/// / <c>Mods.ExplicitMods</c> accessors.
 /// </summary>
 public static class ComponentCompat
 {
@@ -78,5 +80,70 @@ public static class ComponentCompat
     public static bool HasBuffSafe(this Life life, string name)
     {
         return life?.HasBuff(name) ?? false;
+    }
+
+    /// <summary>
+    /// Emulates upstream <c>Mods.ImplicitMods</c>: the item's implicit modifiers only (as opposed
+    /// to the fork's combined <c>Mods.ItemMods</c>).
+    /// </summary>
+    /// <param name="mods">The mods component.</param>
+    /// <returns>
+    /// The implicit modifiers, or an empty list when <paramref name="mods"/> is <c>null</c>, has no
+    /// address, or the range looks corrupt. The fork's public <c>Mods.ItemMods</c>
+    /// (<c>Core/PoEMemory/Components/Mods.cs:47</c>) already builds this same list but concatenates
+    /// it with the explicit mods via the *private* <c>Mods.GetMods(long,long)</c>
+    /// (<c>Mods.cs:106-126</c>); this helper reproduces that exact walk (0x28-byte stride, capped at
+    /// 12 entries) over just the implicit range, using the public
+    /// <c>Mods.ModsStruct.implicitMods</c> field (<c>GameOffsets/ModsComponentOffsets.cs:13</c>) and
+    /// the public <c>RemoteMemoryObject.GetObject&lt;T&gt;</c> (<c>Core/PoEMemory/RemoteMemoryObject.cs:84</c>).
+    /// Compatibility doc, "Components — items".
+    /// </returns>
+    public static List<ItemMod> ImplicitMods(this Mods mods)
+    {
+        if (mods == null)
+            return new List<ItemMod>();
+
+        var range = mods.ModsStruct.implicitMods;
+        return ParseModRange(mods, range.First, range.Last);
+    }
+
+    /// <summary>
+    /// Emulates upstream <c>Mods.ExplicitMods</c>: the item's explicit modifiers only (as opposed
+    /// to the fork's combined <c>Mods.ItemMods</c>).
+    /// </summary>
+    /// <param name="mods">The mods component.</param>
+    /// <returns>
+    /// The explicit modifiers, or an empty list when <paramref name="mods"/> is <c>null</c>, has no
+    /// address, or the range looks corrupt. See <see cref="ImplicitMods"/> for how the range is
+    /// walked; this uses <c>Mods.ModsStruct.explicitMods</c>
+    /// (<c>GameOffsets/ModsComponentOffsets.cs:14</c>) instead. Compatibility doc, "Components — items".
+    /// </returns>
+    public static List<ItemMod> ExplicitMods(this Mods mods)
+    {
+        if (mods == null)
+            return new List<ItemMod>();
+
+        var range = mods.ModsStruct.explicitMods;
+        return ParseModRange(mods, range.First, range.Last);
+    }
+
+    // Mirrors the fork's private Mods.GetMods(long,long) (Mods.cs:106-126): each ItemMod is
+    // 0x28 bytes wide; bail out on a corrupt/oversized range exactly as the fork does (count > 12).
+    private static List<ItemMod> ParseModRange(Mods mods, long begin, long end)
+    {
+        var list = new List<ItemMod>();
+
+        if (mods.Address == 0)
+            return list;
+
+        var count = (end - begin) / 0x28;
+
+        if (count > 12)
+            return list;
+
+        for (var i = begin; i < end; i += 0x28)
+            list.Add(mods.GetObject<ItemMod>(i));
+
+        return list;
     }
 }
