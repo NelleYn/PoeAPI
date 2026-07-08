@@ -26,7 +26,7 @@ public interface IPlugin : IDisposable
     void Render();
     void OnClose();
     void SetApi(GameController gameController, Graphics graphics, PluginManager pluginManager);
-    void OnPluginSelectedInMenu();//TODO: Implement me
+    void OnPluginSelectedInMenu();
     void EntityAdded(Entity entity);
     void EntityRemoved(Entity entity);
     void EntityAddedAny(Entity entity);

@@ -326,10 +326,12 @@ namespace ExileCore.Shared
                     return;
                 }
 
-                //TODO DOUBLE LOAD
-                if (Math.Abs((DateTime.UtcNow-wrapper.LastWrite).TotalSeconds)<2)
+                // FileSystemWatcher fires Changed twice for a single write; dedupe by comparing
+                // the file's on-disk write timestamp instead of a fixed time window, so a
+                // genuine second write shortly after is still handled.
+                var writeTimeUtc = new FileInfo(fullPath).LastWriteTimeUtc;
+                if (!wrapper.TryMarkWriteHandled(writeTimeUtc))
                     return;
-                wrapper.LastWrite = DateTime.UtcNow;
                 Core.MainRunner.Run(new Coroutine(() =>
                 {
                     var fileInfo = new FileInfo(fullPath);
