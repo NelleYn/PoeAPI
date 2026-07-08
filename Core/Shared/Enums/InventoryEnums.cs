@@ -21,6 +21,11 @@ namespace ExileCore.Shared.Enums
         Normal = 0,
         Premium = 1,
         Quad = 7,
+        // Values 2 and 4 are stash tab types read directly from the game's raw TabType byte
+        // (see ServerStashTabOffsets.TabType) but their real names are not confidently known.
+        // Do not guess: renaming these incorrectly would silently mislabel a live stash tab type
+        // for API consumers. Confirm against a live client (or corroborating GGPK/community
+        // reverse-engineering data) before renaming.
         Todo2 = 2,
         Todo4 = 4
     }

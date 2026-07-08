@@ -19,7 +19,8 @@ public class SkillGem : Component
     }
 
     /// <summary>Gets the current gem level.</summary>
-    public int Level => (int)_cachedValue.Value.Level;//TODO: fixme, remove cast
+    // Level is stored as uint in SkillGemOffsets; the cast to int is safe since gem levels never approach uint.MaxValue.
+    public int Level => (int)_cachedValue.Value.Level;
 
     /// <summary>Gets the total experience gained by the gem.</summary>
     public uint TotalExpGained => _cachedValue.Value.TotalExpGained;

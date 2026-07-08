@@ -85,11 +85,4 @@ public sealed class ItemStats
     {
         return stats[(int) stat];
     }
-
-    /// <summary>Obsolete. Always returns <see cref="ItemType.All"/>.</summary>
-    [Obsolete]
-    public ItemType GetSlot()
-    {
-        return ItemType.All;
-    }
 }
