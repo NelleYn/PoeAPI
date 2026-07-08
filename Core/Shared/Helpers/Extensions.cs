@@ -8,6 +8,7 @@ using ExileCore.Shared.Enums;
 using JM.LinqFaster;
 using SharpDX;
 using Vector2 = System.Numerics.Vector2;
+using Vector3 = System.Numerics.Vector3;
 using Vector4 = System.Numerics.Vector4;
 
 namespace ExileCore.Shared.Helpers;
@@ -139,6 +140,16 @@ public static class Extensions
     public static Vector2 ToVector2Num(this SharpDX.Vector2 v)
     {
         return new Vector2(v.X, v.Y);
+    }
+
+    /// <summary>
+    /// Converts a SharpDX vector into a numeric vector.
+    /// </summary>
+    /// <param name="v">The vector to convert.</param>
+    /// <returns>The numeric vector.</returns>
+    public static Vector3 ToVector3Num(this SharpDX.Vector3 v)
+    {
+        return new Vector3(v.X, v.Y, v.Z);
     }
 
     /// <summary>

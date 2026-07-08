@@ -137,6 +137,8 @@ namespace ExileCore.PoEMemory.MemoryObjects
             }
         }
 
+        public System.Numerics.Vector3 PosNum => Pos.ToVector3Num();
+
         public Vector3 BoundsCenterPos
         {
             get
@@ -173,6 +175,8 @@ namespace ExileCore.PoEMemory.MemoryObjects
                 return _gridPos;
             }
         }
+
+        public System.Numerics.Vector2 GridPosNum => GridPos.ToVector2Num();
 
         public string RenderName
         {
