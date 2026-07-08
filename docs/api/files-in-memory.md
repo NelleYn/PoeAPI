@@ -176,7 +176,7 @@ public StatRecord GetStatByAddress(long address);
 
 ### Prophecies (PropheciesDat + ProphecyDat)
 
-`PropheciesDat : UniversalFileWrapper<ProphecyDat>`. Lookup `GetProphecyById(int)` (and `GetByAddress`). `ProphecyDat` members: `Id`, `Name`, `ProphecyId`, `Index`, `PredictionText`, `FlavourText`, `IsEnabled`, `SealCost`, `ProphecyChainPtr`, `ProphecyChainPosition`.
+`PropheciesDat : UniversalFileWrapper<ProphecyDat>`. Lookup `GetProphecyById(int)` (and `GetByAddress`). `ProphecyDat` members: `Id`, `Name`, `ProphecyId`, `Index`, `PredictionText`, `FlavourText`, `IsEnabled`, `SealCost`, `ProphecyChainPtr`, `ProphecyChain` (a `ProphecyChainDat`, resolved from `ProphecyChainPtr`), `ProphecyChainPosition`.
 
 ### Bestiary
 
@@ -260,7 +260,7 @@ var itemName = GameController.Files.BaseItemTypes.Translate(item.Metadata).BaseN
 - `Core/PoEMemory/FilesFromMemory.cs`
 - `Core/PoEMemory/FilesInMemory/` (`UniversalFileWrapper.cs`, `BaseItemTypes.cs`, `ModsDat.cs`, `StatsDat.cs`, `TagsDat.cs`, `WorldAreas.cs`, `MonsterVarieties.cs`, `PassiveSkills.cs`, `PassiveSkill.cs`, `Quests.cs`, `QuestStates.cs`, `PropheciesDat.cs`, `LabyrinthTrials.cs`, `LabyrinthTrial.cs`, `BestiaryCapturableMonsters.cs`, `BetrayalChoice.cs`, `BetrayalJob.cs`, `BetrayalRank.cs`, `BetrayalReward.cs`, `BetrayalTarget.cs`, `Atlas/`, `Metamorph/`)
 - `Core/PoEMemory/Models/BaseItemType.cs`
-- `Core/PoEMemory/MemoryObjects/` (`WorldArea.cs`, `AreaTemplate.cs`, `MonsterVariety.cs`, `ItemMod.cs`, `Quest.cs`, `QuestState.cs`, `ProphecyDat.cs`, `Bestiary*.cs`)
+- `Core/PoEMemory/MemoryObjects/` (`WorldArea.cs`, `AreaTemplate.cs`, `MonsterVariety.cs`, `ItemMod.cs`, `Quest.cs`, `QuestState.cs`, `ProphecyDat.cs`, `ProphecyChainDat.cs`, `Bestiary*.cs`)
 - Plugin cross-check: Get-Chaos-Value (Ninja Price), FullRareSetManager, stashie, EZVendor — `GameController.Files.BaseItemTypes.Translate(...)`.
 
 ## Related
