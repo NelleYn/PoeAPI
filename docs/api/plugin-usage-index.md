@@ -285,17 +285,19 @@ ExileApi exposes versus this fork, alongside the closest equivalent here.
 
 | Upstream-only symbol | Used by (file) | This fork's equivalent |
 |---|---|---|
-| `Entity.PosNum` / `GridPosNum` / `WorldPosNum` (`System.Numerics` position accessors) | Radar (`Radar.cs`), ExpeditionIcons, HarvestPicker, PickItV2 (`PickIt.cs`), ReAgent, WhereAreYouGoing, Beasts (`Beasts.cs`), DevTree, Abyss, Blight, WhereTheCirclesAt, WhereTheWispsAt, +others (~20 repos) | `Render.Pos` (`Vector3`), `Positioned.GridPos` / `WorldPos` (`Vector2`); the upstream `*Num` variants are the `System.Numerics` flavor that this fork does not expose. |
-| `IngameState.UIHoverElement` | DevTree (`DevTree.cs:69`), PickItV2 (`PickIt.cs:348`), EZVendor (`EZVendorCore.cs:246`), WheresMyCraftAt (`Handlers/ElementHandler.cs:18`), ItemFilterLibInspector (`ItemFilterLibInspector.cs:64`) | `IngameState.UIHover` (this fork exposes `UIHover`/`UIHoverTooltip` only; there is no `UIHoverElement`). |
-| `IMemory.ReadStdVector<T>` / `ReadStdVectorStride<T>` + `StdVector` type | Radar (`Radar.Pathfinding.cs:202`), PathfindSanctum (`RewardHelper.cs:320`) | `Memory.ReadStructsArray`, `ReadDoublePtrVectorClasses`, `ReadNativeArray`, `ReadList<T>` (this fork has no `ReadStdVector`/`StdVector`). |
+| `Entity.PosNum` / `GridPosNum` / `WorldPosNum` (`System.Numerics` position accessors) | Radar (`Radar.cs`), ExpeditionIcons, HarvestPicker, PickItV2 (`PickIt.cs`), ReAgent, WhereAreYouGoing, Beasts (`Beasts.cs`), DevTree, Abyss, Blight, WhereTheCirclesAt, WhereTheWispsAt, +others (~20 repos) | `Positioned.GridPos` / `WorldPos` (`Vector2`, SharpDX-typed). **Update (PR #42, `bf1a509`):** `Entity.PosNum` / `GridPosNum` (`System.Numerics` `Vector3`/`Vector2`) now exist (`Core/PoEMemory/MemoryObjects/Entity.cs`) and are documented; only `WorldPosNum` remains unexposed by this fork. |
+| `IMemory.ReadStdVector<T>` / `ReadStdVectorStride<T>` + `StdVector` type | Radar (`Radar.Pathfinding.cs:202`), PathfindSanctum (`RewardHelper.cs:320`) | `Memory.ReadStructsArray`, `ReadDoublePtrVectorClasses`, `ReadNativeArray`, `ReadList<T>`. **Update (PR #42, `668bb93`):** `Memory.ReadStdVector<T>` (both overloads) now exists (`Core/Memory.cs`) and is documented; this fork still has no `ReadStdVectorStride<T>` or a dedicated `StdVector` wrapper type. |
 | `GetComponent<Buffs>()` (a `Buffs` *component*) and `Buffs.BuffsList` | Beasts (`Beasts.cs:117,226`), ReAgent (`RuleState.cs`, `NearbyMonsterInfo.cs`, `FlaskInfo.cs`) | No `Buffs` component in this fork; buffs are on the `Life` component: `Life.Buffs` (`List<Buff>`), `Life.HasBuff(string)`, and the convenience `Entity.Buffs`. (Already noted in components-combat.md.) |
 | `InventorySlotE.ExpandedMainInventory1` (and the `Expanded*` slot family) | Stashie (`Compartments/StashieSettingsHandler.cs:31`, `Compartments/FilterManager.cs:116`) | This fork's `InventorySlotE` (`Core/Shared/Enums/InventorySlotE.cs`) has `MainInventory1` but not the expanded-backpack slot enumerators. |
 | `InventoryIndex.PlayerExpandedInventory` | Stashie (`Compartments/FilterManager.cs:114`) | This fork has no `PlayerExpandedInventory` index in `InventoryIndex`. |
 
 Note: many of these reflect plugins targeting the newer upstream "compiled ExileApi"
-build (expanded-backpack support, `System.Numerics` position helpers, `Buffs` component,
-`ReadStdVector`), which this fork has not adopted. They are recorded here, not invented
-into the reference docs.
+build (expanded-backpack support, remaining `System.Numerics` position helpers, `Buffs`
+component, a strided/typed `std::vector` reader), which this fork has not fully adopted.
+PR #42 (2026-07-08) closed the `IngameState.UIHoverElement` gap entirely (`UIHoverElement`
+is now an alias for `UIHover`, `Core/PoEMemory/MemoryObjects/IngameState.cs`) and partially
+closed the `Entity.*Num` and `IMemory.ReadStdVector<T>` gaps, as reflected in the rows
+above. The remaining gaps are recorded here, not invented into the reference docs.
 
 ---
 
@@ -304,9 +306,11 @@ into the reference docs.
 **The existing `docs/api/*.md` cover everything the real plugins use that this fork
 actually exposes.** Across 45 analyzed plugin repositories and roughly 120 distinct
 ExileCore API symbols observed, there are **0 doc gaps** (every used-and-present symbol is
-documented) and **6 upstream-only symbol families** that this fork does not expose and so
-must live in a compatibility note rather than the reference. The docs are accurate and
-complete for this fork's API surface.
+documented) and **5 upstream-only symbol families** that this fork does not expose and so
+must live in a compatibility note rather than the reference (down from 6 after PR #42
+closed the `IngameState.UIHoverElement` gap and partially closed the `Entity.*Num` /
+`IMemory.ReadStdVector<T>` gaps — see [Upstream-only symbols](#upstream-only-symbols)).
+The docs are accurate and complete for this fork's API surface.
 
 ---
 
