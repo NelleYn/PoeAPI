@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
 using ExileCore.PoEMemory;
 using ExileCore.Shared.Enums;
+using ExileCore.Shared.SomeMagic;
 
 namespace ExileCore.Shared.Interfaces;
 

@@ -31,7 +31,7 @@ Inside a `RemoteMemoryObject` you reach it through the `M` property; from a plug
 | `ReadMem` | `byte[] ReadMem(long addr, int size)` / `(IntPtr addr, int size)` | Raw byte buffer. Returns `new byte[0]` for `size <= 0` or non-positive address; logs and rethrows on native failure. |
 | `ReadBytes` | `byte[] ReadBytes(long addr, int size)` / `(long addr, long size)` | Thin aliases over `ReadMem`. |
 
-> The `Read<T>(Pointer addr)` overloads and `ReadSecondPointerArray_Count` exist on the interface but `throw NotImplementedException` — do not call them.
+> `Read<T>(Pointer addr)` / `Read<T>(Pointer addr, params int[] offsets)` resolve `Pointer.BaseAddress`/`Pointer.Offsets` and delegate to the `Read<T>(IntPtr, params int[])` pointer-chain overload above. `ReadSecondPointerArray_Count(long startAddress, int count)` reads `count` consecutive 8-byte pointers starting at `startAddress` (like `ReadPointersArray` but count-based instead of end-address-based).
 
 ### Reading strings
 

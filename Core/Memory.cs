@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using ExileCore.PoEMemory;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
 using ExileCore.Shared.Interfaces;
+using ExileCore.Shared.SomeMagic;
 using GameOffsets.Native;
 using ProcessMemoryUtilities.Memory;
 
@@ -224,16 +224,44 @@ public class Memory : IMemory
         return result;
     }
 
-    /// <summary>Not implemented.</summary>
+    /// <summary>Reads <paramref name="count"/> consecutive 64-bit pointers starting at the given address.</summary>
     public IList<long> ReadSecondPointerArray_Count(long startAddress, int count)
     {
-        throw new NotImplementedException();
+        var result = new List<long>();
+
+        if (count <= 0 || count > 20000)
+            return result;
+
+        var length = count * 8;
+
+        sw.Restart();
+        result = new List<long>(count);
+        var bytes = ReadMem(startAddress, length);
+
+        for (var i = 0; i < length; i += 8)
+        {
+            if (sw.ElapsedMilliseconds > 2000)
+            {
+                DebugWindow.LogError($"ReadSecondPointerArray_Count error result count: {result.Count}");
+                return new List<long>();
+            }
+
+            result.Add(i + 8 <= bytes.Length ? BitConverter.ToInt64(bytes, i) : 0L);
+        }
+
+        return result;
     }
 
-    /// <summary>Not implemented.</summary>
+    /// <summary>Reads a value of type <typeparamref name="T"/> by following the pointer's base address and offset chain.</summary>
     public T Read<T>(Pointer addr, params int[] offsets) where T : struct
     {
-        throw new NotImplementedException();
+        if (addr == null) return default;
+
+        var combined = new int[addr.Offsets.Count + offsets.Length];
+        addr.Offsets.CopyTo(combined, 0);
+        offsets.CopyTo(combined, addr.Offsets.Count);
+
+        return combined.Length == 0 ? Read<T>(addr.BaseAddress) : Read<T>(addr.BaseAddress, combined);
     }
 
     /// <summary>Reads a value of type <typeparamref name="T"/> by following a chain of pointer offsets from the given address.</summary>
@@ -264,10 +292,10 @@ public class Memory : IMemory
         return Read<T>(new IntPtr(addr), offsets);
     }
 
-    /// <summary>Not implemented.</summary>
+    /// <summary>Reads a value of type <typeparamref name="T"/> by following the pointer's base address and offset chain.</summary>
     public T Read<T>(Pointer addr) where T : struct
     {
-        throw new NotImplementedException();
+        return Read<T>(addr, Array.Empty<int>());
     }
 
     /// <summary>Reads a value of type <typeparamref name="T"/> directly from the given address.</summary>
