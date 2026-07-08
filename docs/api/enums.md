@@ -211,7 +211,7 @@ Higher-level "which inventory is open" enum: `InvalidInventory` (nothing open), 
 Logical equipment/inventory slot index: `None = 0`, `Helm`, `Amulet`, `Chest`, `LWeapon`, `RWeapon`, `LWeaponSwap`, `RWeaponSwap`, `LRing`, `RRing`, `Gloves`, `Belt`, `Boots`, `PlayerInventory`, `Flask`.
 
 ### `InventoryTabType` (in `InventoryEnums.cs`)
-Stash tab type: `Normal = 0`, `Premium = 1`, `Currency = 3`, `Map = 5`, `Divination = 6`, `Quad = 7`, `Essence = 8`, `Fragment = 9` (plus `Todo2 = 2`, `Todo4 = 4` placeholders). Backed by `uint`.
+Stash tab type: `Normal = 0`, `Premium = 1`, `Currency = 3`, `Map = 5`, `Divination = 6`, `Quad = 7`, `Essence = 8`, `Fragment = 9`. Backed by `uint`. `Todo2 = 2` and `Todo4 = 4` are raw values read from `ServerStashTabOffsets.TabType` whose real stash-tab names are not yet confidently identified (no corroborating source in this repo or public documentation); do not guess/rename them without confirming against a live client, since this enum is public-facing API.
 
 ### `InventoryTabFlags` `[Flags]` (in `InventoryEnums.cs`)
 `byte`-backed stash-tab flag bits: `RemoveOnly = 1`, `Public = 0x20`, `MapSeries = 0x40`, `Hidden = 0x80`, `Premium = 4`, plus `Unknown*` slots.
