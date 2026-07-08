@@ -83,6 +83,25 @@ public partial class ItemData
 
     public StackData StackInfo { get; private set; } = new StackData(0, 0);
 
+    /// <summary>Map projection; <c>null</c> unless the entity has a <c>Map</c> component (see README).</summary>
+    public MapData MapInfo { get; private set; }
+
+    /// <summary>Charge projection; <c>null</c> unless the entity has a <c>Charges</c> component.</summary>
+    public ChargeData ChargeInfo { get; private set; }
+
+    /// <summary>Attribute-requirement projection; <c>null</c> unless the entity has an
+    /// <c>AttributeRequirements</c> component.</summary>
+    public AttributeRequirementsData AttributeRequirementsInfo { get; private set; }
+
+    /// <summary>Skill-gem projection; <c>null</c> unless the entity has a <c>SkillGem</c> component.</summary>
+    public SkillGemData SkillGemInfo { get; private set; }
+
+    /// <summary>Weapon stat projection; <c>null</c> unless the entity has a <c>Weapon</c> component.</summary>
+    public WeaponData WeaponInfo { get; private set; }
+
+    /// <summary>Armour/defence stat projection; <c>null</c> unless the entity has an <c>Armour</c> component.</summary>
+    public ArmourData ArmourInfo { get; private set; }
+
     private void ParseItem(Entity item, GameController gc)
     {
         if (item == null)
@@ -161,5 +180,41 @@ public partial class ItemData
         var quality = item.GetComponent<Quality>();
         if (quality != null)
             ItemQuality = quality.ItemQuality;
+
+        var map = item.GetComponent<Map>();
+        if (map != null)
+        {
+            var area = map.Area;
+            MapInfo = new MapData(map.Tier, area?.Id, area?.Name, area?.AreaLevel ?? 0, map.MapSeries);
+        }
+
+        var charges = item.GetComponent<Charges>();
+        if (charges != null)
+            ChargeInfo = new ChargeData(charges.NumCharges, charges.ChargesPerUse, charges.ChargesMax);
+
+        var attributeRequirements = item.GetComponent<AttributeRequirements>();
+        if (attributeRequirements != null)
+            AttributeRequirementsInfo = new AttributeRequirementsData(
+                attributeRequirements.strength,
+                attributeRequirements.dexterity,
+                attributeRequirements.intelligence);
+
+        var skillGem = item.GetComponent<SkillGem>();
+        if (skillGem != null)
+            SkillGemInfo = new SkillGemData(
+                skillGem.Level,
+                skillGem.MaxLevel,
+                skillGem.TotalExpGained,
+                skillGem.ExperienceMaxLevel,
+                skillGem.ExperienceToNextLevel,
+                skillGem.SocketColor);
+
+        var weapon = item.GetComponent<Weapon>();
+        if (weapon != null)
+            WeaponInfo = new WeaponData(weapon.DamageMin, weapon.DamageMax, weapon.AttackTime, weapon.CritChance);
+
+        var armour = item.GetComponent<Armour>();
+        if (armour != null)
+            ArmourInfo = new ArmourData(armour.ArmourScore, armour.EvasionScore, armour.EnergyShieldScore);
     }
 }
