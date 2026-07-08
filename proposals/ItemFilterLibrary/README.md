@@ -44,12 +44,23 @@ So the upstream binary will **not** build against this fork; this port replaces 
 
 Everything else in the recipe's "members that **do** exist here" list ports cleanly (verified below).
 
+**Update:** this fork's `Core` does have standalone `Map` / `Charges` / `AttributeRequirements` /
+`SkillGem` / `Weapon` / `Armour` components
+(`Core/PoEMemory/Components/{Map,Charges,AttributeRequirements,SkillGem,Weapon,Armour}.cs`,
+present since long before this port — the earlier revision of this README simply hadn't grepped for
+them). `ItemData` now exposes `MapInfo` / `ChargeInfo` / `AttributeRequirementsInfo` / `SkillGemInfo` /
+`WeaponInfo` / `ArmourInfo` projections backed by those components (`null` when the entity doesn't
+carry the component — see
+[Members now wired up](#members-now-wired-up-post-verification) below). Per-category mod lists and
+influence/price/scourge data remain unbacked (no new members appeared for those; see
+[Members deliberately NOT used](#members-deliberately-not-used-absent-from-this-fork)).
+
 ## Files in this port
 
 | File | Role | Notes vs upstream |
 |------|------|-------------------|
 | `ItemData.cs` | Flat, query-friendly snapshot of one item, built from an `Entity`. Ctors take an `Entity`, a `LabelOnGround`, or a `NormalInventoryItem` (+ `GameController`). | `TryGetComponent` → `GetComponent`+null-check. Influence/price/scourge flat props dropped (absent). Subclassable for the `CustomItemData` pattern (it is `partial`, not `sealed`). |
-| `ItemData.Nested.cs` | Nested `ModsData` / `SocketData` / `StackData` projections referenced by `ItemData`. | `ModsData` has only the combined `ItemMods` (no per-category lists). Upstream `MapData`/`ChargeData`/`AttributeRequirementsData`/`SkillGemData` omitted (backing members out of this port's verified scope). |
+| `ItemData.Nested.cs` | Nested `ModsData` / `SocketData` / `StackData` / `MapData` / `ChargeData` / `AttributeRequirementsData` / `SkillGemData` / `WeaponData` / `ArmourData` projections referenced by `ItemData`. | `ModsData` has only the combined `ItemMods` (no per-category lists). `MapData`/`ChargeData`/`AttributeRequirementsData`/`SkillGemData`/`WeaponData`/`ArmourData` are backed by this fork's `Map`/`Charges`/`AttributeRequirements`/`SkillGem`/`Weapon`/`Armour` components and populated only when the entity has the matching component (`null` otherwise). |
 | `ItemFilter.cs` | Compiled rule set: `LoadFromPath` / `LoadFromString` / `LoadFromList` + `Matches(ItemData)`. Parses blank-line-separated blocks, concatenates multi-line rules, strips `//` comments (respecting string literals), and honours the `^` exclusion prefix. | Faithful to the recipe's documented rule language; `Matches` guards `Entity?.IsValid` and swallows per-rule runtime exceptions. |
 | `ItemQuery.cs` | One compiled rule: a Dynamic LINQ `Func<ItemData,bool>`, with `FailedToCompile` behaviour. | A bad rule logs via `DebugWindow.LogError`, stores the message on `FailedToCompile`, and compiles to constant `false` — it never matches, never throws. |
 | `CustomDynamicLinqCustomTypeProvider.cs` | Dynamic LINQ type provider that registers this fork's engine enums so rules can name them by short name (with `ResolveTypesBySimpleName = true`). | Registers every public enum in the ExileCore assembly (`ItemRarity`, `GameStat`, …) on top of the Dynamic LINQ defaults. Base ctor is package-version-sensitive (targets 1.3.5). |
@@ -104,27 +115,83 @@ Enums, inventory, logging
 - `Core/PoEMemory/Elements/LabelOnGround.cs:26` — `LabelOnGround.ItemOnGround`.
 - `Core/DebugWindow.cs:130` — `DebugWindow.LogError(string, float)`.
 
+Map / charge / attribute / skill-gem / weapon / armour components (wired up in this revision — see below)
+- `Core/PoEMemory/Components/Map.cs` — `Tier:33`, `Area:30` (a `WorldArea`), `MapSeries:36`.
+- `Core/PoEMemory/MemoryObjects/WorldArea.cs` — `Id:11`, `Name:13`, `AreaLevel:17`.
+- `Core/PoEMemory/Components/Charges.cs` — `NumCharges:9`, `ChargesPerUse:12`, `ChargesMax:15`.
+- `Core/PoEMemory/Components/AttributeRequirements.cs` — `strength:9`, `dexterity:12`, `intelligence:15`.
+- `Core/PoEMemory/Components/SkillGem.cs` — `Level:22`, `MaxLevel:37`, `TotalExpGained:25`,
+  `ExperienceMaxLevel:31`, `ExperienceToNextLevel:34`, `SocketColor:40`.
+- `Core/PoEMemory/Components/Weapon.cs` — `DamageMin:9`, `DamageMax:12`, `AttackTime:15`, `CritChance:18`.
+- `Core/PoEMemory/Components/Armour.cs` — `EvasionScore:9`, `ArmourScore:12`, `EnergyShieldScore:15`.
+- `Core/Shared/Enums/InventoryTabMapSeries.cs` — `InventoryTabMapSeries` enum (registered by the type
+  provider for short-name use, same as any other public engine enum).
+
+## Members now wired up (post-verification)
+
+The original revision of this port omitted `MapData` / `ChargeData` / `AttributeRequirementsData` /
+`SkillGemData` / weapon / armour projections under the assumption that no backing components existed
+on this fork. That assumption was never actually re-checked against `Core/PoEMemory/Components/` — a
+grep shows `Map`, `Charges`, `AttributeRequirements`, `SkillGem`, `Weapon` and `Armour` components have
+existed there since long before this port was written, each reading real, already-verified offsets (no
+new/guessed memory offsets were added to implement this — see [Scope note](#scope-note)). This revision
+wires them up:
+
+- **`MapInfo` (`MapData`)** — `Tier`, `AreaId`/`AreaName`/`AreaLevel` (from `Map.Area`, a `WorldArea`),
+  `MapSeries`. `null` unless the entity has a `Map` component (e.g. non-map items).
+- **`ChargeInfo` (`ChargeData`)** — `NumCharges`, `ChargesPerUse`, `ChargesMax`. `null` unless the
+  entity has a `Charges` component (e.g. flasks).
+- **`AttributeRequirementsInfo` (`AttributeRequirementsData`)** — `Strength`/`Dexterity`/`Intelligence`
+  (PascalCase wrappers around the fork's lowercase `strength`/`dexterity`/`intelligence` members).
+  `null` unless the entity has an `AttributeRequirements` component.
+- **`SkillGemInfo` (`SkillGemData`)** — `Level`, `MaxLevel`, `TotalExpGained`, `ExperienceMaxLevel`,
+  `ExperienceToNextLevel`, `SocketColor`. `null` unless the entity has a `SkillGem` component.
+- **`WeaponInfo` (`WeaponData`)** — `DamageMin`, `DamageMax`, `AttackTime`, `CritChance` (from the
+  `Weapon` component, `Core/PoEMemory/Components/Weapon.cs`). `null` unless the entity has a `Weapon`
+  component.
+- **`ArmourInfo` (`ArmourData`)** — `ArmourScore`, `EvasionScore`, `EnergyShieldScore` (from the
+  `Armour` component, `Core/PoEMemory/Components/Armour.cs`). `null` unless the entity has an `Armour`
+  component.
+
+All six are `null`-when-absent (unlike `ModsInfo`/`SocketInfo`/`StackInfo`, which default to
+zero-valued instances) because, unlike `Mods`/`Sockets`/`Stack`/`Quality`, these components are only
+present on a subset of item types — rules should guard with `MapInfo != null && …` etc. (Dynamic LINQ's
+`&&` short-circuits, so this is safe.)
+
+### Scope note
+
+Extending `ItemData` to expose these was in scope for this pass (reading existing public component
+members from the proposal, matching the pattern already used for `Base`/`Mods`/`Sockets`/`Stack`/
+`Quality`). Adding brand-new *public members to `Mods`* to expose the per-category mod lists
+(`ExplicitMods`/`ImplicitMods`/…) would additionally require editing `Core/PoEMemory/Components/Mods.cs`
+itself — out of scope for this proposal-only pass — so those, and the influence/price/scourge flat
+properties (no matching members exist anywhere in `Core`, verified by grep), remain omitted below.
+
 ## Members deliberately NOT used (absent from this fork)
 
 Per the recipe's [Compatibility caveats](../../docs/api/cookbook/item-filtering.md#compatibility-caveats)
-and confirmed against `master`:
+and confirmed against `master`. Unlike `MapData`/`ChargeData`/`AttributeRequirementsData`/
+`SkillGemData`/weapon/armour (see [Members now wired up](#members-now-wired-up-post-verification)
+above, previously listed here but now implemented), **no** backing member exists anywhere in `Core`
+for the following — confirmed by grep, not merely by the original port-time assumption:
 
 - **`Entity.TryGetComponent<T>(out T)`** — does not exist. Replaced everywhere with
   `var c = e.GetComponent<T>(); if (c != null) { … }` (see `GetComponent<T>` — `Entity.cs:605`).
 - **`Mods.ExplicitMods` / `Mods.ImplicitMods` / `Mods.EnchantedMods` / `Mods.FracturedMods` /
   `Mods.ScourgeMods` / `Mods.SynthesisMods` / `Mods.CrucibleMods`** — none exist; the fork's `Mods`
-  exposes only the combined `ItemMods` (implicit + explicit, `Mods.cs:39`). `ModsData` therefore
-  exposes only `ItemMods`; rules that need a specific affix category cannot be ported until the
-  component is extended.
+  exposes only the combined `ItemMods` (implicit + explicit, `Mods.cs:39`). Internally `Mods` already
+  reads separate implicit/explicit ranges (`ModsStruct.implicitMods` / `ModsStruct.explicitMods`, both
+  `NativePtrArray`) and concatenates them before returning `ItemMods` via the private
+  `Mods.GetMods(long, long)` helper — so adding public `ExplicitMods`/`ImplicitMods` properties to
+  `Core/PoEMemory/Components/Mods.cs` would likely be a small, low-risk follow-up (two one-line
+  wrappers around the existing offsets/helper, no new offsets needed). It's simply out of scope for
+  *this* pass, which only wires up components from the `proposals/` side without touching `Core/`
+  (see [Scope note](#scope-note)) — so `ModsData` still exposes only `ItemMods`. A future pass that is
+  allowed to touch `Core/PoEMemory/Components/Mods.cs` could close this gap.
 - **`Base.PublicPrice` / `Base.InfluenceFlag` / `Base.ScourgedTier` / `Base.isHunter` /
   `Base.isWarlord` / `Base.isCrusader` / `Base.isRedeemer` / `Base.CurrencyItemLevel`** — absent; the
   fork's `Base` has only `Name`, `ItemCellsSizeX/Y`, `isCorrupted`, `isShaper`, `isElder`
   (`Base.cs:10-15`). The influence / price / scourge flat properties are dropped from `ItemData`.
-- **Upstream nested projections `MapData` (`MapInfo.Tier`), `ChargeData`, `AttributeRequirementsData`,
-  `SkillGemData`, weapon/armour stat projections** — omitted from this port. Their backing components
-  are outside this unit's verified scope (the recipe scopes `ItemData` to `Base`/`Mods`/`Sockets`/
-  `Stack`/`Quality` + `BaseItemTypes`), so registering them would risk fabricating offsets/members.
-  Add them the same way once the corresponding component members are verified on this fork.
 
 ## How to integrate
 
