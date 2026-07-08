@@ -125,11 +125,14 @@ Game model & gating
 
 Entity & components
 - `Core/PoEMemory/RemoteMemoryObject.cs:12` — `Address`.
-- `Core/PoEMemory/MemoryObjects/Entity.cs:97` `IsValid`; `:279` `Buffs`; `:605` `GetComponent<T>()`. (No `TryGetComponent`.)
+- `Core/PoEMemory/MemoryObjects/Entity.cs:97` `IsValid`; `:279` `Buffs`; `:580` `HasComponent<T>()`; `:605` `GetComponent<T>()`. (No `TryGetComponent`.)
 - `Core/PoEMemory/MemoryObjects/ServerInventory.cs:11` `ServerInventory`; `:31` `InventorySlotItems`; `:115` `InventSlotItem`; `:119` `Item`; `:120` `PosX`.
 - `Core/PoEMemory/MemoryObjects/ActorSkill.cs:8` `ActorSkill`; `:13` `CanBeUsed`; `:24` `Name`.
-- `Core/PoEMemory/Components/Life.cs:11` `Life`; `:27` `CurHP`; `:36` `HPPercentage`; `:37` `MPPercentage`; `:38` `ESPercentage`; `:45` `Buffs`; `:84` `HasBuff(string)`.
-- `Core/PoEMemory/Components/Buff.cs:6` `Buff`; `:34` `Name`; `:35` `Charges` (byte); `:38` `MaxTime`; `:39` `Timer`.
+- `Core/PoEMemory/Components/Life.cs:14` `Life`; `:37` `CurHP`; `:64` `HPPercentage`; `:67` `MPPercentage`; `:70` `ESPercentage`; `:79` `Buffs`; `:122` `HasBuff(string)`. (Re-verified
+  against the current file; these members gained XML doc comments since this table was first written,
+  shifting line numbers — content/signatures are unchanged.)
+- `Core/PoEMemory/Components/Buff.cs:9` `Buff`; `:41` `Name`; `:44` `Charges` (byte); `:49` `MaxTime`; `:52` `Timer`. (Re-verified;
+  same drift as `Life.cs` above.)
 - `Core/PoEMemory/Components/Charges.cs:3` `Charges`; `:5` `NumCharges`; `:6` `ChargesPerUse`; `:7` `ChargesMax`.
 - `Core/PoEMemory/Components/Flask.cs` — `Flask` (empty marker component).
 - `Core/PoEMemory/Components/Actor.cs:10` `Actor`; `:77` `ActorSkills`.
@@ -143,9 +146,23 @@ Input
   `UseHotkeyAction` and `BuffUtil` press keys via P/Invoke / an external simulator. Neither is used here:
   `UseHotkeyAction` calls the engine `Input.KeyPressRelease(Keys)` (rate-limited ~10 ms). `Input.KeyDown`/
   `KeyUp`/`KeyPress` are available for held/coroutine presses.
-- **`Buffs` component (`player.GetComponent<Buffs>().BuffsList`)** — does not exist on this fork. Buffs are
-  read off `Life` (`Life.Buffs` / `Life.HasBuff`), and also exposed on `Entity.Buffs`.
-- **`Entity.TryGetComponent<T>(out ...)`** — does not exist. `GetComponent<T>()` is null-checked instead.
+- **`Buffs` component (`player.GetComponent<Buffs>().BuffsList`)** — does not exist on this fork
+  (confirmed by grep: no `Buffs` type under `Core/PoEMemory/Components/`). `PlayerHelper` reads the fix
+  directly, not a workaround: `Life.Buffs` (`List<Buff>`) and `Life.HasBuff(string)` on
+  `Core/PoEMemory/Components/Life.cs:79,122`. `Entity.Buffs` (`Core/PoEMemory/MemoryObjects/Entity.cs:279`)
+  is the same data via a convenience accessor, but `PlayerHelper.Life` is fetched once via
+  `GameController.Player.GetComponent<Life>()` and `.Buffs`/`.HasBuff` are read straight off it, because
+  `Life.Buffs` is backed by a `FrameCache<List<Buff>>` (recomputed at most once per rendered frame; see
+  `Core/Shared/Cache/FrameCache.cs`), whereas `Entity.Buffs` is backed by a `ValidCache<List<Buff>>` whose
+  `Update()` returns `true` (i.e. re-reads process memory) on **every** access while the entity is valid
+  (`Core/Shared/Cache/ValidCache.cs`) — going through `Life` avoids redundant memory reads when a tree
+  checks several buffs in one pass. Behaviorally identical; `Entity.Buffs` is fine for a single ad-hoc read.
+- **`Entity.TryGetComponent<T>(out ...)`** — does not exist (confirmed by grep over
+  `Core/PoEMemory/MemoryObjects/Entity.cs`; only `GetComponent<T>()` and `HasComponent<T>()` are present,
+  at lines 605 and 580). `PlayerHelper`/`FlaskHelper` call `GetComponent<T>()` and null-check the result
+  (`?.`) instead of the `out`-parameter pattern; this is a straight substitution, not a workaround — there
+  is no loss of information versus a hypothetical `TryGetComponent`, since `GetComponent<T>()` already
+  returns `null` on a missing component (see `Entity.cs:605-617`).
 - **`Life.Health` / `Life.Mana` / `Life.EnergyShield` aggregate objects** — absent. Percentages come from
   the flat `HPPercentage`/`MPPercentage`/`ESPercentage` helpers (× 100 for a 0..100 value).
 - **`Buff.DisplayName` / `Buff.BuffCharges` / `Buff.FlaskSlot`** — absent. Only `Name`/`Charges`/`Timer`/
@@ -158,6 +175,13 @@ Input
 - **TreeSharp events / `Guid` equality / `Parallel` composite** — the upstream TreeSharp carries a few
   extras (behaviour-tree events, node identity, a parallel composite) not needed by the flask pattern;
   this port keeps the minimal node set the cookbook and `BasicFlaskRoutine.CreateTree()` actually use.
+
+**Verification note:** the two bullets above (`Buffs` component / `TryGetComponent`) were re-audited
+against `Core/PoEMemory/Components/Life.cs`, `Core/PoEMemory/Components/Buff.cs`,
+`Core/PoEMemory/MemoryObjects/Entity.cs` and `Core/Shared/Cache/{FrameCache,ValidCache,CachedValue}.cs`
+line-by-line. The port's `.cs` files never called a `Buffs` component or `TryGetComponent` to begin with
+— `PlayerHelper`/`FlaskHelper` were written directly against the real accessors above. There is nothing
+left to swap out.
 
 ## How to integrate
 
