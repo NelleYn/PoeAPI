@@ -73,7 +73,7 @@ namespace ExileCore.Shared
                         if (Plugin.Initialized)
                         {
                             var coroutines = Core.MainRunner.Coroutines.Concat(Core.ParallelRunner.Coroutines).ToList();
-                            coroutines.Where(x => x.Owner == Plugin).ToList();
+                            coroutines = coroutines.Where(x => x.Owner == Plugin).ToList();
                             if (value)
                             {
                                
