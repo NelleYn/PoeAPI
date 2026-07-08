@@ -30,10 +30,13 @@ public class ProphecyDat : RemoteMemoryObject
     public string FlavourText => flavourText != null ? flavourText : flavourText = M.ReadStringU(M.Read<long>(Address + 0x1c), 255);
 
     /// <summary>Gets the pointer to the prophecy chain this prophecy belongs to.</summary>
-    public long ProphecyChainPtr => M.Read<long>(Address + 0x44); //TODO ProphecyChainDat
+    public long ProphecyChainPtr => M.Read<long>(Address + 0x44);
+
+    /// <summary>Gets the prophecy chain this prophecy belongs to, or null if it does not belong to one.</summary>
+    public ProphecyChainDat ProphecyChain => ProphecyChainPtr == 0 ? null : GetObject<ProphecyChainDat>(ProphecyChainPtr);
 
     /// <summary>Gets the position of this prophecy within its chain.</summary>
-    public int ProphecyChainPosition => M.Read<int>(Address + 0x4c); //TODO ProphecyChainDat
+    public int ProphecyChainPosition => M.Read<int>(Address + 0x4c);
 
     /// <summary>Gets a value indicating whether the prophecy is enabled.</summary>
     public bool IsEnabled => M.Read<byte>(Address + 0x50) > 0;

@@ -71,6 +71,7 @@ namespace ExileCore.PoEMemory.MemoryObjects
         public IngameUIElements IngameUi => _ingameUi.Value;
         public Element UIRoot => _UIRoot.Value;
         public Element UIHover => _UIHover.Value;
+        public Element UIHoverElement => UIHover;
         public float UIHoverX => _UIHoverX.Value;
         public float UIHoverY => _UIHoverY.Value;
         public Element UIHoverTooltip => _UIHoverTooltip.Value;

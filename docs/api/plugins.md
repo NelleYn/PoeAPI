@@ -69,7 +69,7 @@ public interface IPlugin : IDisposable
 | `void Render()` | Per-frame draw hook. Use `Graphics` here. See [game-controller.md](game-controller.md). |
 | `void OnClose()` | Called when the plugin closes; the base class saves settings here. |
 | `void SetApi(GameController, Graphics, PluginManager)` | Injects the core APIs. Called by the engine before settings load; the base class stores them. |
-| `void OnPluginSelectedInMenu()` | Called when the plugin is selected in the menu (marked TODO in core; safe to override). |
+| `void OnPluginSelectedInMenu()` | Called when the plugin is selected in the menu. `BaseSettingsPlugin` provides a no-op default; override to react. |
 | `void EntityAdded(Entity entity)` | A gameplay-relevant entity entered the world. |
 | `void EntityRemoved(Entity entity)` | An entity left the world / was removed. |
 | `void EntityAddedAny(Entity entity)` | Any entity was added, including non-gameplay ones. |

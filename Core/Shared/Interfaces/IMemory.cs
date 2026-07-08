@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
 using ExileCore.PoEMemory;
 using ExileCore.Shared.Enums;
+using ExileCore.Shared.SomeMagic;
 
 namespace ExileCore.Shared.Interfaces;
 
@@ -50,6 +50,19 @@ public interface IMemory : IDisposable
         where T : RemoteMemoryObject, new();
 
     IList<long> ReadPointersArray(long startAddress, long endAddress, int offset = 8);
+
+    /// <summary>
+    /// Reads a native MSVC <c>std::vector&lt;T&gt;</c> (triple-pointer begin/end/end_of_storage layout at
+    /// <paramref name="address"/>) of inline value structs.
+    /// </summary>
+    IList<T> ReadStdVector<T>(long address) where T : struct;
+
+    /// <summary>
+    /// Reads a native MSVC <c>std::vector&lt;T*&gt;</c> (triple-pointer begin/end/end_of_storage layout at
+    /// <paramref name="address"/>) of pointers to remote-memory objects.
+    /// </summary>
+    IList<T> ReadStdVector<T>(long address, RemoteMemoryObject game) where T : RemoteMemoryObject, new();
+
     IList<long> ReadSecondPointerArray_Count(long startAddress, int count);
     T Read<T>(Pointer addr, params int[] offsets) where T : struct;
     T Read<T>(IntPtr addr, params int[] offsets) where T : struct;

@@ -15,6 +15,7 @@ namespace ExileCore.Shared
     {
         private static readonly Stopwatch sw = Stopwatch.StartNew();
         private double startTick;
+        private readonly object _hotReloadLocker = new object();
         public DateTime LastWrite { get; set; } = DateTime.MinValue;
         public PluginWrapper(IPlugin plugin)
         {
@@ -140,6 +141,23 @@ namespace ExileCore.Shared
             return initialise;
 
         }
+
+        /// <summary>
+        /// Atomically checks whether <paramref name="writeTimeUtc"/> was already handled and, if not,
+        /// records it as handled. Used to coalesce FileSystemWatcher's duplicate Changed events for a
+        /// single write while still allowing a genuine subsequent write to go through.
+        /// </summary>
+        public bool TryMarkWriteHandled(DateTime writeTimeUtc)
+        {
+            lock (_hotReloadLocker)
+            {
+                if (LastWrite == writeTimeUtc)
+                    return false;
+                LastWrite = writeTimeUtc;
+                return true;
+            }
+        }
+
         public void SubscrideOnFile(Action<PluginWrapper,FileSystemEventArgs> action)
         {
             var fileSystemWatcher = new FileSystemWatcher()

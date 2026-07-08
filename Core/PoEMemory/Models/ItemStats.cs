@@ -64,7 +64,10 @@ public sealed class ItemStats
 
     private void ParseSockets()
     {
-        //todo ParseSockets do nothing
+        if (!item.HasComponent<Sockets>()) return;
+        var component = item.GetComponent<Sockets>();
+        AddToMod(ItemStatEnum.Sockets, component.NumberOfSockets);
+        AddToMod(ItemStatEnum.LinkedSockets, component.LargestLinkSize);
     }
 
     /// <summary>Adds <paramref name="value"/> to the accumulated total for the given <paramref name="stat"/>.</summary>
