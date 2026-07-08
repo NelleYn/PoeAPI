@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using ExileCore.PoEMemory;
@@ -219,6 +220,57 @@ public class Memory : IMemory
             }
 
             result.Add(BitConverter.ToInt64(bytes, i));
+        }
+
+        return result;
+    }
+
+    /// <summary>Reads a native MSVC std::vector&lt;T&gt; (begin/end/end_of_storage triple-pointer header at address) of inline value structs.</summary>
+    public IList<T> ReadStdVector<T>(long address) where T : struct
+    {
+        var result = new List<T>();
+        var begin = Read<long>(address);
+        var end = Read<long>(address + 0x8);
+
+        if (begin <= 0 || end <= begin)
+            return result;
+
+        var elementSize = Marshal.SizeOf<T>();
+        var length = end - begin;
+        var count = length / elementSize;
+
+        if (count > 100000)
+        {
+            DebugWindow.LogError($"Maybe overflow memory in {nameof(ReadStdVector)} for reading structures of type: {typeof(T).Name}", 3);
+            return result;
+        }
+
+        var bytes = ReadMem(begin, (int) length);
+        result.Capacity = (int) count;
+
+        for (var offset = 0; offset + elementSize <= bytes.Length; offset += elementSize)
+        {
+            result.Add(MemoryMarshal.Read<T>(bytes.AsSpan(offset, elementSize)));
+        }
+
+        return result;
+    }
+
+    /// <summary>Reads a native MSVC std::vector&lt;T*&gt; (begin/end/end_of_storage triple-pointer header at address) of pointers to remote-memory objects.</summary>
+    public IList<T> ReadStdVector<T>(long address, RemoteMemoryObject game) where T : RemoteMemoryObject, new()
+    {
+        var begin = Read<long>(address);
+        var end = Read<long>(address + 0x8);
+
+        if (begin <= 0 || end <= begin)
+            return new List<T>();
+
+        var pointers = ReadPointersArray(begin, end, 8);
+        var result = new List<T>(pointers.Count);
+
+        foreach (var pointer in pointers)
+        {
+            result.Add(game.GetObject<T>(pointer));
         }
 
         return result;
