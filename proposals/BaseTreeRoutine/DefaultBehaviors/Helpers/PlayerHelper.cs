@@ -32,7 +32,13 @@ public sealed class PlayerHelper
     /// <summary>The local player's <see cref="Life"/> component, or <c>null</c> if unavailable.</summary>
     public Life Life => _gameController?.Player?.GetComponent<Life>();
 
-    /// <summary>The player's current buff list (may be <c>null</c>).</summary>
+    /// <summary>
+    /// The player's current buff list (may be <c>null</c>). Read via <see cref="Life"/> rather than the
+    /// equivalent <c>Entity.Buffs</c> convenience accessor: <c>Life.Buffs</c> is frame-cached (recomputed
+    /// at most once per render), whereas <c>Entity.Buffs</c> re-reads process memory on every access while
+    /// the entity is valid — going through <see cref="Life"/> avoids redundant reads across the several
+    /// buff checks a tree tick typically performs.
+    /// </summary>
     public List<Buff> Buffs => Life?.Buffs;
 
     /// <summary>Unreserved HP as a 0..100 percentage.</summary>
