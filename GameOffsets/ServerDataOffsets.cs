@@ -32,7 +32,7 @@ namespace GameOffsets
         [FieldOffset(0x6BC4 - Skip)] public int CharacterLevel;
         [FieldOffset(0x6BC8 - Skip)] public int PassiveRefundPointsLeft;
         [FieldOffset(0x6BCC - Skip)] public int QuestPassiveSkillPoints;
-        [FieldOffset(0x63D0 - Skip)] public int FreePassiveSkillPointsLeft;//TODO: 3.8.1 fix me
+        [FieldOffset(0x63D0 - Skip)] public int FreePassiveSkillPointsLeft;//Known-stale offset dating to game version 3.8.1, far outside the sibling passive/ascendancy cluster (0x6BC8-0x6BD8); consumed by ServerData.FreePassiveSkillPointsLeft, needs re-verification against a live game before trusting
         [FieldOffset(0x6BD4 - Skip)] public int TotalAscendencyPoints;
         [FieldOffset(0x6BD8 - Skip)] public int SpentAscendencyPoints;
         [FieldOffset(0x6DD8 - Skip)] public byte PartyStatusType;

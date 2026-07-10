@@ -9,7 +9,9 @@ namespace ExileCore.PoEMemory.MemoryObjects
         private string varietyId;
         public int Id { get; internal set; }
         public string VarietyId => varietyId != null ? varietyId : varietyId = M.ReadStringU(M.Read<long>(Address));
-        public long MonsterTypePtr => M.Read<long>(Address + 0x10); //TODO
+        // Raw unresolved pointer to the MonsterTypes.dat record (cf. MonsterVarietiesStruct.MonsterTypePtr
+        // at 0x10 in GameOffsets/Components/Monster.cs); never wrapped in a typed object.
+        public long MonsterTypePtr => M.Read<long>(Address + 0x10);
         public int ObjectSize => M.Read<int>(Address + 0x1c);
         public int MinimumAttackDistance => M.Read<int>(Address + 0x20);
         public int MaximumAttackDistance => M.Read<int>(Address + 0x24);
