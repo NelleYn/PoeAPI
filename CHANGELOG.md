@@ -1,3 +1,23 @@
+## 2026-07-10
+
+### Fixes
+
+- `63f05b2` Core/Shared/SomeMagic: fix CS0121 GetBytes ambiguity for sbyte/byte on .NET 10
+- `47210d3` Fix Loader AppForm tray menu: migrate legacy ContextMenu/MenuItem to ContextMenuStrip/ToolStripMenuItem
+- `9bd9176` Fix ThreadUnit.ForceAbort crashing on .NET 10 by replacing Thread.Abort with a cooperative stop
+- `59fd739` Fix SettingsContainer first-run null CoreSettings and write-lock leaks
+- `f9e8ec8` Fix Runner skipping the coroutine shifted into a removed slot
+- `344f2aa` Remove missing git-ignored plugin projects from ExileApi.sln
+
+### Other
+
+- `c67710a` Promote Compat helpers from proposals/ into Core/Shared/Compat
+- `dbee5eb` Resolve code TODOs: implement ActorSkill.IsMine, document three stale markers
+
+### Documentation
+
+- `e4e29b0` docs(architecture): sln no longer lists plugin projects
+
 ## 2026-07-09
 
 ### Documentation
