@@ -70,10 +70,15 @@ public static unsafe class TypeConverter
                 break;
             case TypeCode.Boolean:
                 return BitConverter.GetBytes((bool) (object) generic);
+            // The explicit (short) casts preserve the pre-.NET-7 overload resolution: BitConverter
+            // has no GetBytes(sbyte)/GetBytes(byte), and the implicit sbyte/byte -> System.Half
+            // conversions added in .NET 7 made these calls ambiguous between GetBytes(Half) and
+            // GetBytes(short) (CS0121). The resulting 2-byte width for these 1-byte types is
+            // historical behavior, intentionally kept.
             case TypeCode.SByte:
-                return BitConverter.GetBytes((sbyte) (object) generic);
+                return BitConverter.GetBytes((short) (sbyte) (object) generic);
             case TypeCode.Byte:
-                return BitConverter.GetBytes((byte) (object) generic);
+                return BitConverter.GetBytes((short) (byte) (object) generic);
             case TypeCode.Int16:
                 return BitConverter.GetBytes((short) (object) generic);
             case TypeCode.UInt16:
