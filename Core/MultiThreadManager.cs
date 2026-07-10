@@ -304,8 +304,7 @@ public class ThreadUnit
     private readonly Stopwatch sw;
     private readonly Thread thread;
     private bool _wait = true;
-    private volatile bool abort;
-    private bool running = true;
+    private volatile bool running = true;
 
     /// <summary>Creates and starts a background worker thread with the given name and slot number.</summary>
     public ThreadUnit(string name, int number)
@@ -433,25 +432,28 @@ public class ThreadUnit
         return jobSetted;
     }
 
-    /// <summary>Requests a cooperative stop: marks jobs complete/failed and ends the run loop.</summary>
+    /// <summary>
+    /// Requests a cooperative stop: marks both jobs completed/failed, ends the run loop and wakes
+    /// the thread if it is parked. A delegate that is still executing keeps running until it returns.
+    /// </summary>
     public void Abort()
     {
         Job.IsCompleted = true;
         SecondJob.IsCompleted = true;
         Job.IsFailed = true;
-        Job.IsFailed = true;
-        abort = true;
-
-        if (_wait)
-            _event.Set();
-
+        SecondJob.IsFailed = true;
         running = false;
+        _event.Set();
     }
 
-    /// <summary>Forcefully aborts the underlying thread.</summary>
+    /// <summary>
+    /// Last-resort stop for a thread that stayed stuck after <see cref="Abort"/>: re-marks both jobs
+    /// completed/failed and ends the run loop so the pool can abandon the unit. A wedged delegate
+    /// keeps running until it returns; the thread is a background thread, so it cannot keep the
+    /// process alive.
+    /// </summary>
     public void ForceAbort()
     {
-        abort = true;
-        thread.Abort();
+        Abort();
     }
 }
