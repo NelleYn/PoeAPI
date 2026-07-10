@@ -42,8 +42,9 @@ public struct PropheciesStruct
 
     public byte TotalActive;
     public byte Unknown0;
-    // TODO: I wonder if we can create
-    // fixed array of const size 7 over here?
+    // C# fixed buffers only support primitive element types, so ProphecyStruct can't be a fixed buffer.
+    // A .NET 8+ [InlineArray] could model this, but the Prophecy league mechanic was removed from the
+    // game (3.17), so the layout is kept as-is.
     public ProphecyStruct P1;
     public ProphecyStruct P2;
     public ProphecyStruct P3;

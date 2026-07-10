@@ -85,7 +85,7 @@ namespace ExileCore.PoEMemory.MemoryObjects
         public bool IsTotem => GetStat(GameStat.IsTotem) == 1 || GetStat(GameStat.SkillIsTotemified) == 1;
         public bool IsTrap => GetStat(GameStat.IsTrap) == 1 || GetStat(GameStat.SkillIsTrapped) == 1;
         public bool IsVaalSkill => SoulsPerUse >= 1 && TotalVaalUses >= 1;
-        private bool IsMine => true; //TODO
+        private bool IsMine => GetStat(GameStat.IsRemoteMine) == 1 || GetStat(GameStat.SkillIsMined) == 1;
         /*public int UsesAvailable
         {
             get
