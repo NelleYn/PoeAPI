@@ -1,9 +1,7 @@
-// EXPERIMENTAL candidate — see proposals/Compat/README.md. Not part of the build.
-
 using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.MemoryObjects;
 
-namespace ExileCore.Shared.Compat;
+namespace ExileCore.Shared;
 
 /// <summary>
 /// <see cref="Entity"/> extensions that bridge control-flow shapes ExileApi-Compiled plugins
