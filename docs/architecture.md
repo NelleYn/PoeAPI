@@ -11,8 +11,8 @@ data and render whatever they want.
 
 ## Solution layout
 
-`ExileApi.sln` contains three core projects (it also lists plugin projects under
-`Plugins/Source/`, which are loaded/compiled at runtime — see section 7):
+`ExileApi.sln` contains three core projects (plugins live under the git-ignored
+`Plugins/Source/` and are loaded/compiled at runtime, not via the solution — see section 7):
 
 | Project | Assembly | Role |
 | --- | --- | --- |
