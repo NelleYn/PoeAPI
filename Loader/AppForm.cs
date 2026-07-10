@@ -8,25 +8,23 @@ namespace Loader
 {
     public class AppForm : RenderForm
     {
-        private readonly ContextMenu contextMenu1;
+        private readonly ContextMenuStrip contextMenu1;
         public Action FixImguiCapture;
         private readonly NotifyIcon notifyIcon;
 
         public AppForm()
         {
             SuspendLayout();
-            contextMenu1 = new ContextMenu();
-            var menuItem1 = new MenuItem();
-            var menuItem2 = new MenuItem();
-            contextMenu1.MenuItems.AddRange(new[] {menuItem1, menuItem2});
+            contextMenu1 = new ContextMenuStrip();
+            var menuItem1 = new ToolStripMenuItem();
+            var menuItem2 = new ToolStripMenuItem();
+            contextMenu1.Items.AddRange(new ToolStripItem[] {menuItem2, menuItem1});
 
-            menuItem2.Index = 0;
             menuItem2.Text = "Bring to Front";
 
-            menuItem1.Index = 1;
             menuItem1.Text = "E&xit";
             notifyIcon = new NotifyIcon();
-            notifyIcon.ContextMenu = contextMenu1;
+            notifyIcon.ContextMenuStrip = contextMenu1;
             notifyIcon.Icon = Icon;
             menuItem1.Click += (sender, args) => { Close(); };
 
