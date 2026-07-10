@@ -176,7 +176,8 @@ namespace ExileCore.Shared
                         DateTime.Now));
 
                     FinishedCoroutineCount++;
-                    Coroutines.Remove(coroutine);
+                    Coroutines.RemoveAt(i);
+                    i--;
                 }
             }
         }
@@ -233,7 +234,8 @@ namespace ExileCore.Shared
                         DateTime.Now));
 
                     FinishedCoroutineCount++;
-                    Coroutines.Remove(coroutine);
+                    Coroutines.RemoveAt(i);
+                    i--;
                 }
             }
 
