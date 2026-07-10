@@ -1,5 +1,3 @@
-// EXPERIMENTAL candidate — see proposals/Compat/README.md. Not part of the build.
-
 using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.MemoryObjects;
@@ -7,7 +5,7 @@ using ExileCore.Shared.Helpers;
 using NumVector2 = System.Numerics.Vector2;
 using NumVector3 = System.Numerics.Vector3;
 
-namespace ExileCore.Shared.Compat;
+namespace ExileCore.Shared;
 
 /// <summary>
 /// <c>System.Numerics</c> accessors that emulate the ExileApi-Compiled members
@@ -16,47 +14,15 @@ namespace ExileCore.Shared.Compat;
 /// This fork stores positions and bounds as <see cref="SharpDX.Vector2"/> / <see cref="SharpDX.Vector3"/>
 /// (see the compatibility doc, "Entity &amp; EntityListWrapper" and "Components — combat &amp; character").
 /// These extension methods convert at the call boundary using the fork's existing
-/// <c>ToVector2Num</c> converter (<c>Core/Shared/Helpers/Extensions.cs:139</c>); the fork has no
-/// SharpDX→Numerics <see cref="System.Numerics.Vector3"/> converter, so the Vector3 conversions are inline.
+/// <c>ToVector2Num</c> / <c>ToVector3Num</c> converters
+/// (<c>Core/Shared/Helpers/Extensions.cs:140,150</c>). Upstream <c>Entity.PosNum</c> and
+/// <c>Entity.GridPosNum</c> are not emulated here because Core already ships them as instance
+/// properties (<c>Core/PoEMemory/MemoryObjects/Entity.cs:140,179</c>).
 /// </para>
 /// </summary>
 public static class NumericsCompat
 {
-    /// <summary>
-    /// Converts a <see cref="SharpDX.Vector3"/> into a <see cref="System.Numerics.Vector3"/>.
-    /// </summary>
-    /// <param name="v">The SharpDX vector to convert.</param>
-    /// <returns>The numeric vector.</returns>
-    /// <remarks>
-    /// Inline because the fork only ships <c>ToVector2Num</c> / <c>ToVector4Num</c> in
-    /// <c>Core/Shared/Helpers/Extensions.cs</c>; there is no Vector3 converter.
-    /// </remarks>
-    public static NumVector3 ToVector3Num(this SharpDX.Vector3 v)
-    {
-        return new NumVector3(v.X, v.Y, v.Z);
-    }
-
     // ---- Entity --------------------------------------------------------------
-
-    /// <summary>
-    /// Emulates upstream <c>Entity.PosNum</c>: the entity world position as <see cref="System.Numerics.Vector3"/>.
-    /// </summary>
-    /// <param name="e">The entity.</param>
-    /// <returns>The world position. Builds on the fork's <c>Entity.Pos</c> (<c>Entity.cs:121</c>).</returns>
-    public static NumVector3 PosNum(this Entity e)
-    {
-        return e.Pos.ToVector3Num();
-    }
-
-    /// <summary>
-    /// Emulates upstream <c>Entity.GridPosNum</c>: the entity grid position as <see cref="System.Numerics.Vector2"/>.
-    /// </summary>
-    /// <param name="e">The entity.</param>
-    /// <returns>The grid position. Builds on the fork's <c>Entity.GridPos</c> (<c>Entity.cs:157</c>).</returns>
-    public static NumVector2 GridPosNum(this Entity e)
-    {
-        return e.GridPos.ToVector2Num();
-    }
 
     /// <summary>
     /// Emulates upstream <c>Entity.BoundsNum</c>: the entity render bounds as <see cref="System.Numerics.Vector3"/>.
@@ -71,7 +37,7 @@ public static class NumericsCompat
     public static NumVector3 BoundsNum(this Entity e)
     {
         var render = e.GetComponent<Render>();
-        return render == null ? NumVector3.Zero : render.Bounds.ToVector3Num();
+        return render == null ? NumVector3.Zero : render.BoundsNum();
     }
 
     // ---- Positioned ----------------------------------------------------------

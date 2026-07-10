@@ -1,24 +1,28 @@
-// EXPERIMENTAL candidate — see proposals/Compat/README.md. Not part of the build.
-
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ExileCore.Shared.Interfaces;
 using GameOffsets.Native;
 
-namespace ExileCore.Shared.Compat;
+namespace ExileCore.Shared;
 
 /// <summary>
 /// <see cref="IMemory"/> extensions that emulate the ExileApi-Compiled member
 /// <c>IMemory.ReadStdVector&lt;T&gt;</c> for reading a contiguous C++ <c>std::vector</c> of
 /// <b>value</b> (unmanaged) elements.
 /// <para>
-/// This fork has no <c>ReadStdVector</c> in either tree (compatibility doc, "Memory (low-level)" —
-/// upstream's <c>ReadStdVector&lt;T&gt;</c> maps to the fork's <c>ReadStructsArray&lt;T&gt;</c> for
-/// <see cref="ExileCore.PoEMemory.RemoteMemoryObject"/> classes, or <c>ReadNativeArray&lt;T&gt;</c> for
-/// a vector of <i>pointers</i>). These helpers cover the remaining case — a vector storing structs
-/// inline — by reading each element with the fork's existing <c>Read&lt;T&gt;(long)</c>
-/// (<c>Core/Memory.cs:288</c>) and walking the <see cref="NativePtrArray"/> (<c>begin</c>/<c>end</c>)
-/// bounds (<c>GameOffsets/Native/NativePtrArray.cs</c>).
+/// The fork's instance overloads (<c>IMemory.ReadStdVector&lt;T&gt;(long address)</c> /
+/// <c>(long, RemoteMemoryObject)</c>, <c>Core/Shared/Interfaces/IMemory.cs:58,64</c>) read the
+/// vector <i>header</i> from a pointer; upstream's <c>ReadStdVector&lt;T&gt;</c> also accepts an
+/// already-read header or raw begin/end bounds. These extensions cover those shapes — sharing the
+/// <c>ReadStdVector</c> name intentionally for plugin compatibility (the parameter lists do not
+/// collide) — with one bulk <c>IMemory.ReadMem</c> (<c>Core/Shared/Interfaces/IMemory.cs:41</c>)
+/// over the <see cref="NativePtrArray"/> (<c>begin</c>/<c>end</c>) bounds
+/// (<c>GameOffsets/Native/NativePtrArray.cs</c>), decoded per element exactly like the fork's
+/// instance overload (<c>Core/Memory.cs:229</c>). For a vector of
+/// <see cref="ExileCore.PoEMemory.RemoteMemoryObject"/> classes prefer
+/// <c>ReadStructsArray&lt;T&gt;</c>; for a vector of <i>pointers</i> prefer
+/// <c>ReadNativeArray&lt;T&gt;</c>.
 /// </para>
 /// </summary>
 public static class MemoryCompat
@@ -39,9 +43,9 @@ public static class MemoryCompat
     /// </returns>
     /// <remarks>
     /// Element stride is <see cref="Marshal.SizeOf{T}()"/>, which is correct for blittable
-    /// <c>[StructLayout(LayoutKind.Sequential)]</c> structs. Each element is read with the fork's
-    /// <c>IMemory.Read&lt;T&gt;(long)</c> (<c>Core/Memory.cs:288</c>); for a vector of pointers prefer
-    /// the fork's <c>ReadNativeArray&lt;T&gt;</c> instead.
+    /// <c>[StructLayout(LayoutKind.Sequential)]</c> structs. The whole range is fetched with a single
+    /// bulk <c>IMemory.ReadMem</c> call; for a vector of pointers prefer the fork's
+    /// <c>ReadNativeArray&lt;T&gt;</c> instead.
     /// </remarks>
     public static List<T> ReadStdVector<T>(this IMemory memory, NativePtrArray nativePtrArray)
         where T : unmanaged
@@ -81,15 +85,22 @@ public static class MemoryCompat
         if (elementSize <= 0 || startAddress <= 0 || endAddress <= startAddress)
             return result;
 
-        var count = (endAddress - startAddress) / elementSize;
+        var length = endAddress - startAddress;
+        var count = length / elementSize;
         if (count <= 0 || count > MaxElements)
             return result;
 
+        // One bulk read + per-element decode, mirroring the fork's instance
+        // ReadStdVector<T>(long) (Core/Memory.cs:229), instead of one process-memory
+        // read per element — these helpers sit on hot per-frame plugin paths.
+        var bytes = memory.ReadMem(startAddress, (int)length);
         result.Capacity = (int)count;
 
-        for (var address = startAddress; address < endAddress; address += elementSize)
+        // Offset-bounded so a range that is not an exact multiple of elementSize never
+        // decodes past the buffer (the trailing partial element is skipped).
+        for (var offset = 0; offset + elementSize <= bytes.Length; offset += elementSize)
         {
-            result.Add(memory.Read<T>(address));
+            result.Add(MemoryMarshal.Read<T>(bytes.AsSpan(offset, elementSize)));
         }
 
         return result;

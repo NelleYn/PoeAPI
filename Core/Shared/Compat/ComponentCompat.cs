@@ -1,16 +1,13 @@
-// EXPERIMENTAL candidate — see proposals/Compat/README.md. Not part of the build.
-
 using System.Collections.Generic;
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.MemoryObjects;
 
-namespace ExileCore.Shared.Compat;
+namespace ExileCore.Shared;
 
 /// <summary>
 /// Small per-component helpers that bridge fork member names to the shapes ExileApi-Compiled
-/// plugins expect: <c>Stack.MaxSize</c>, the 2-argument <c>SoundController.PlaySound(file, volume)</c>,
-/// an upstream-style <c>Life.GetBuffs()</c> accessor, and the per-affix-category <c>Mods.ImplicitMods</c>
-/// / <c>Mods.ExplicitMods</c> accessors.
+/// plugins expect: <c>Stack.MaxSize</c>, an upstream-style <c>Life.GetBuffs()</c> accessor, and the
+/// per-affix-category <c>Mods.ImplicitMods</c> / <c>Mods.ExplicitMods</c> accessors.
 /// </summary>
 public static class ComponentCompat
 {
@@ -30,28 +27,6 @@ public static class ComponentCompat
     }
 
     /// <summary>
-    /// Emulates the upstream 2-argument <c>SoundController.PlaySound(string file, float volume)</c> overload.
-    /// </summary>
-    /// <param name="soundController">The sound controller.</param>
-    /// <param name="name">The sound name (or file) to play.</param>
-    /// <param name="volume">The master output volume (0..1) to apply before playback.</param>
-    /// <remarks>
-    /// The fork ships only the 1-argument <c>PlaySound(string)</c> (<c>Core/SoundController.cs:71</c>)
-    /// and a separate <c>SetVolume(float)</c> (<c>Core/SoundController.cs:138</c>)
-    /// (compatibility doc, "Graphics, fonts &amp; sound"). This helper composes the two:
-    /// it sets the master volume, then plays. Note the volume is the <i>master</i> volume and persists
-    /// for subsequent playbacks until changed again — matching how the fork's mastering voice behaves.
-    /// </remarks>
-    public static void PlaySound(this SoundController soundController, string name, float volume)
-    {
-        if (soundController == null)
-            return;
-
-        soundController.SetVolume(volume);
-        soundController.PlaySound(name);
-    }
-
-    /// <summary>
     /// Emulates an upstream-style <c>GetBuffs()</c> accessor over the fork's <c>Life.Buffs</c> list.
     /// </summary>
     /// <param name="life">The life component.</param>
@@ -59,9 +34,10 @@ public static class ComponentCompat
     /// The active buffs, or an empty list when unavailable. Builds on <c>Life.Buffs</c>
     /// (<c>Life.cs:79</c>). In ExileApi-Compiled buffs are exposed via a dedicated <c>Buffs</c>
     /// component; this fork reads them off <c>Life</c> / <c>Entity.Buffs</c> (compatibility doc,
-    /// "Components — combat &amp; character").
+    /// "Components — combat &amp; character"). Returns <see cref="List{T}"/> to match the upstream
+    /// shape that ported call sites expect.
     /// </returns>
-    public static IReadOnlyList<Buff> GetBuffs(this Life life)
+    public static List<Buff> GetBuffs(this Life life)
     {
         return life?.Buffs ?? new List<Buff>();
     }
@@ -127,8 +103,10 @@ public static class ComponentCompat
         return ParseModRange(mods, range.First, range.Last);
     }
 
-    // Mirrors the fork's private Mods.GetMods(long,long) (Mods.cs:106-126): each ItemMod is
-    // 0x28 bytes wide; bail out on a corrupt/oversized range exactly as the fork does (count > 12).
+    // Mirrors the fork's private Mods.GetMods(long,long) (Core/PoEMemory/Components/Mods.cs:106-126):
+    // each ItemMod is 0x28 bytes wide; bail out on a corrupt/oversized range exactly as the fork does
+    // (count > 12). The stride and cap intentionally duplicate that private method and must be kept
+    // in sync with it if Mods.cs ever changes.
     private static List<ItemMod> ParseModRange(Mods mods, long begin, long end)
     {
         var list = new List<ItemMod>();

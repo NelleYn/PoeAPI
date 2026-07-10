@@ -14,8 +14,10 @@ currency exchange, Azmeri, Ancestor, Necropolis, Ultimatum, Expedition, Harvest,
 Delve…) plus richer members on types that already exist here. The doc workers who wrote
 `docs/api/*.md` repeatedly hit this: properties such as `Entity.PosNum`,
 `Mods.EnchantedMods`, `Stack.MaxSize`, `Inventory.NestedVisibleInventoryIndex` and the path
-`IngameState.Data.ServerData` appear in real plugins but do **not** compile here. This file
-collects those gaps in one place.
+`IngameState.Data.ServerData` appear in real plugins but did **not** compile here. This file
+collects those gaps in one place. The highest‑traffic gaps have since been closed: some as
+real Core members (`Entity.PosNum`/`GridPosNum`), the rest as extension methods in
+`Core/Shared/Compat/` (namespace `ExileCore.Shared`) — rows below marked **compat‑helper**.
 
 ### Ground truth and its caveats
 
@@ -172,18 +174,21 @@ full **stat‑description translation pipeline**.
 
 The heart of the doc. *Status* legend: **missing** (member not in this fork at all),
 **renamed** (same concept, different name here), **signature‑diff** (present but different
-shape/type). Unless the Notes say "in reconstruction", the upstream member is absent from the
-reconstruction tree too and is confirmed via the cited reference‑plugin call site; the *This
-fork* column names the in‑repo equivalent (file cited where non‑obvious).
+shape/type), **compat‑helper** (emulated by an extension method shipped in
+`Core/Shared/Compat/`, namespace `ExileCore.Shared` — note these are *methods*, so upstream
+*property* call sites need parentheses, e.g. `render.RotationNum().X` instead of
+`render.RotationNum.X`). Unless the Notes say "in reconstruction", the upstream member is
+absent from the reconstruction tree too and is confirmed via the cited reference‑plugin call
+site; the *This fork* column names the in‑repo equivalent (file cited where non‑obvious).
 
 ### Entity & EntityListWrapper
 
 | Upstream (compiled) member | This fork | Status | Notes |
 | --- | --- | --- | --- |
-| `Entity.PosNum` : `System.Numerics.Vector3` | `Entity.Pos` : `SharpDX.Vector3` | missing | Used in `WAYG/WhereAreYouGoing.cs:187`. Fork has only the SharpDX `Pos`; convert. `Core/PoEMemory/MemoryObjects/Entity.cs`. |
-| `Entity.GridPosNum` : `Vector2` (Numerics) | `Entity.GridPos` : SharpDX `Vector2` | missing | `WAYG:374`. |
-| `Entity.BoundsNum` (via Render) | `Render.Bounds` : SharpDX `Vector3` | missing | `WAYG:315`. No `Bounds` on `Entity`. |
-| `Entity.TryGetComponent<T>(out T)` : `bool` | `GetComponent<T>()` (null‑check) | missing | `WAYG:179` `player.TryGetComponent<Positioned>(out var p)`. Fork pattern: `var c = e.GetComponent<T>(); if (c != null)`. |
+| `Entity.PosNum` : `System.Numerics.Vector3` | `Entity.PosNum` (instance property) | present | Used in `WAYG/WhereAreYouGoing.cs:187`. Now a real instance property — `Core/PoEMemory/MemoryObjects/Entity.cs:140` (SharpDX `Pos` remains at `Entity.cs`). |
+| `Entity.GridPosNum` : `Vector2` (Numerics) | `Entity.GridPosNum` (instance property) | present | `WAYG:374`. Now a real instance property — `Entity.cs:179`. |
+| `Entity.BoundsNum` (via Render) | `Entity.BoundsNum()` extension | compat‑helper | `WAYG:315`. Still no `Bounds` on `Entity`; the helper (`Core/Shared/Compat/NumericsCompat.cs`) reads `Render.Bounds`, returns `Vector3.Zero` without a `Render`. |
+| `Entity.TryGetComponent<T>(out T)` : `bool` | `Entity.TryGetComponent<T>(out T)` extension | compat‑helper | `WAYG:179` `player.TryGetComponent<Positioned>(out var p)` now compiles via `Core/Shared/Compat/EntityCompat.cs` (thin wrapper over `GetComponent<T>()`). |
 | `EntityListWrapper.NotOnlyPlayer` | `Entities` / `OnlyValidEntities` / `NotOnlyValidEntities` | renamed/missing | Fork list members in `Core/EntityListWrapper.cs:128‑142`; there is no `NotOnlyPlayer`. |
 
 ### Components — combat & character
@@ -191,19 +196,19 @@ fork* column names the in‑repo equivalent (file cited where non‑obvious).
 | Upstream member | This fork | Status | Notes |
 | --- | --- | --- | --- |
 | `Actor.ActorVaalSkills` | `Actor.ActorSkills` only | missing | `Core/PoEMemory/Components/Actor.cs:79` has `ActorSkills`/`DeployedObjects`/`CurrentAction`; no Vaal‑skills list. |
-| `Buffs` (component) | `Entity.Buffs` (`List<Buff>`) | missing | No `Buffs` *component*; here buffs come off the entity. `Core/PoEMemory/MemoryObjects/Entity.cs`. (Component exists in reconstruction: `Core/PoEMemory/Components/Buffs.cs`.) |
-| `Render.RotationNum` : Numerics `Vector3` | `Render.Rotation` : SharpDX `Vector3` | missing | `WAYG:348` `renderComp.RotationNum.X`. |
+| `Buffs` (component) | `Entity.Buffs` (`List<Buff>`) | missing | No `Buffs` *component*; here buffs come off the entity. `Core/PoEMemory/MemoryObjects/Entity.cs`. (Component exists in reconstruction: `Core/PoEMemory/Components/Buffs.cs`.) Null‑safe accessors `Life.GetBuffs()` / `Life.HasBuffSafe(string)` ship in `Core/Shared/Compat/ComponentCompat.cs`. |
+| `Render.RotationNum` : Numerics `Vector3` | `Render.RotationNum()` extension | compat‑helper | `WAYG:348` `renderComp.RotationNum.X` → `renderComp.RotationNum().X`; `Core/Shared/Compat/NumericsCompat.cs` (also `Render.PosNum()` / `Render.BoundsNum()`). |
 | `Render.Size` | — | missing | No `Size` on `Render` in either tree; fork exposes `Bounds`/`Height`. `Core/PoEMemory/Components/Render.cs`. |
 
 ### Components — items
 
 | Upstream member | This fork | Status | Notes |
 | --- | --- | --- | --- |
-| `Mods.ImplicitMods` : `List<ItemMod>` | `Mods.ItemMods` (all) | missing | `gcv/Ninja Price/Main/CustomItem.cs:196`. Fork has only the combined `ItemMods` + `HumanImpStats`. `Core/PoEMemory/Components/Mods.cs`. |
-| `Mods.ExplicitMods` : `List<ItemMod>` | `Mods.ItemMods` (all) | missing | `gcv/.../CustomItem.cs:194`. Fork's `ExplicitMods` token only appears as the private `ParseExplicitMods()` in `Models/ItemStats.cs`. |
+| `Mods.ImplicitMods` : `List<ItemMod>` | `Mods.ImplicitMods()` extension | compat‑helper | `gcv/Ninja Price/Main/CustomItem.cs:196`. `Core/Shared/Compat/ComponentCompat.cs` walks `ModsStruct.implicitMods` with the same stride/guard as the fork's private `Mods.GetMods`; `Mods.ItemMods` remains the combined list. |
+| `Mods.ExplicitMods` : `List<ItemMod>` | `Mods.ExplicitMods()` extension | compat‑helper | `gcv/.../CustomItem.cs:194`. Same helper family over `ModsStruct.explicitMods` (`Core/Shared/Compat/ComponentCompat.cs`). |
 | `Mods.EnchantedMods` | — | missing | `stashie/ItemData.cs:109` `modsComp?.EnchantedMods?.Count`. Not in fork `Mods`. |
 | `Mods.IncubatorName` | — | missing | No incubator member on fork `Mods`. |
-| `Stack.MaxSize` | `Stack.Size` only | missing | `Core/PoEMemory/Components/Stack.cs` exposes `Size` and `Info`; no `MaxSize` (read `Stack.Info.MaxStackSize` via `CurrencyInfo` instead). |
+| `Stack.MaxSize` | `Stack.MaxSize()` extension | compat‑helper | `Core/PoEMemory/Components/Stack.cs` exposes `Size` and `Info`; the helper (`Core/Shared/Compat/ComponentCompat.cs`) reads `Stack.Info.MaxStackSize` via `CurrencyInfo`, returning `0` when unavailable. |
 | `SkillGem.SkillExperience` / `ExperienceMax` | `ExperienceMaxLevel`, `ExperiencePrevLevel`, `ExperienceToNextLevel` | renamed | `Core/PoEMemory/Components/SkillGem.cs:31‑34`. Names/semantics differ; map carefully. |
 
 ### Components — world & interactables
@@ -212,7 +217,7 @@ fork* column names the in‑repo equivalent (file cited where non‑obvious).
 | --- | --- | --- | --- |
 | `Chest.Rarity` | — | missing | `Core/PoEMemory/Components/Chest.cs` exposes `IsOpened/IsLocked/IsStrongbox/IsLarge/…`; no `Rarity`. Use `Entity.Rarity` / `ObjectMagicProperties.Rarity`. |
 | `Transitionable.CurrentState` | `Flag1` / `Flag2` (`byte`) | renamed/signature‑diff | `Core/PoEMemory/Components/Transitionable.cs:9‑12`. Upstream `CurrentState`; here read `Flag1`. |
-| `Positioned.WorldPosNum` : `Vector2` (Numerics) | `Positioned.WorldPos` : SharpDX `Vector2` | missing | Same Numerics↔SharpDX split as `Entity.PosNum`. Fork: `Core/PoEMemory/Components/Positioned.cs:40` (also `GridPos`/`GridPosI`/`GridPosition`). |
+| `Positioned.WorldPosNum` : `Vector2` (Numerics) | `Positioned.WorldPosNum()` extension | compat‑helper | `Core/Shared/Compat/NumericsCompat.cs` (also `Positioned.GridPosNum()`), converting `Positioned.WorldPos` — `Core/PoEMemory/Components/Positioned.cs:40` (also `GridPos`/`GridPosI`/`GridPosition`). |
 
 ### IngameState / IngameData / ServerData
 
@@ -225,7 +230,7 @@ fork* column names the in‑repo equivalent (file cited where non‑obvious).
 
 | Upstream member | This fork | Status | Notes |
 | --- | --- | --- | --- |
-| `Element.PositionNum` : Numerics `Vector2` | `Element.Position` : SharpDX `Vector2` | missing | `Core/PoEMemory/Element.cs`. |
+| `Element.PositionNum` : Numerics `Vector2` | `Element.PositionNum()` extension | compat‑helper | `Core/Shared/Compat/NumericsCompat.cs`, converting `Element.Position` (`Core/PoEMemory/Element.cs:61`). |
 | `Element.TextColour` / `HighlightBackgroundColor` | — | missing | Base `Element` exposes no colour members in either tree; read `Text`, supply your own colour. |
 | `Map.LargeMap.AsObject<SubMap>().MapCenter` / `.MapScale` / `.Zoom` | `Map.LargeMapShiftX/Y`, `LargeMapZoom` (floats) | missing | `Radar/Radar.cs:238‑242` casts to `SubMap`. Fork's `Map.LargeMap` is a plain `Element` and there is **no `SubMap` type**; `Core/PoEMemory/Elements/Map.cs`. (`SubMap` *is* in the reconstruction.) |
 
@@ -243,7 +248,7 @@ fork* column names the in‑repo equivalent (file cited where non‑obvious).
 | Upstream member | This fork | Status | Notes |
 | --- | --- | --- | --- |
 | `FontAlign.VerticalCenter` (`Top`/`Bottom`) | `FontAlign` = `Left`/`Center`/`Right` | missing | `ProximityAlert/Proximity.cs:200` `FontAlign.Center \| FontAlign.VerticalCenter`. Fork enum has no vertical flags; `Core/Shared/Enums/FontAlign.cs`. |
-| `SoundController.PlaySound(string file, float volume)` | `SoundController.PlaySound(string name)` | signature‑diff | `gcv/Ninja Price/Main/Render.cs:1116` passes a volume. Fork has the 1‑arg overload only; `Core/SoundController.cs:71`. |
+| `SoundController.PlaySound(string file, float volume)` | `SoundController.PlaySound(string name)` | signature‑diff | `gcv/Ninja Price/Main/Render.cs:1116` passes a volume. Fork has the 1‑arg overload only; `Core/SoundController.cs:71`. Deliberately **not** given a compat helper: the only composable fork member, `SetVolume` (`SoundController.cs:138`), mutates the global **master** volume (upstream's parameter is per‑playback) and throws on an uninitialized controller. Call `SetVolume` + `PlaySound` yourself if global‑volume semantics are acceptable. |
 
 ### FilesInMemory (static data lookups)
 
@@ -256,7 +261,7 @@ fork* column names the in‑repo equivalent (file cited where non‑obvious).
 
 | Upstream member | This fork | Status | Notes |
 | --- | --- | --- | --- |
-| `IMemory.ReadStdVector<T>(...)` / `Memory.ReadStdVector<T>` | `ReadStructsArray<T>` / `ReadNativeArray<T>` | missing | `Radar/Radar.Pathfinding.cs:202`. No `ReadStdVector` in either tree; `Core/Memory.cs` (read methods at `:137`, `:451`), `Core/Shared/Interfaces/IMemory.cs`. |
+| `IMemory.ReadStdVector<T>(...)` / `Memory.ReadStdVector<T>` | `IMemory.ReadStdVector<T>` (instance + extensions) | present / compat‑helper | `Radar/Radar.Pathfinding.cs:202`. Fork now has instance overloads reading the vector header from a pointer (`Core/Shared/Interfaces/IMemory.cs:58,64`); `Core/Shared/Compat/MemoryCompat.cs` adds the upstream shapes over `NativePtrArray` / raw begin‑end bounds for unmanaged structs. For `RemoteMemoryObject` vectors / pointer vectors use `ReadStructsArray<T>` / `ReadNativeArray<T>` (`Core/Memory.cs:138`, `:531`). |
 
 ### Settings / Nodes / Attributes
 
