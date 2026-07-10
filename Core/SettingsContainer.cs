@@ -67,12 +67,13 @@ public class SettingsContainer
             if (!File.Exists(SETTINGS_FILE_NAME))
             {
                 var coreSettings = new CoreSettings();
+                CoreSettings = coreSettings;
                 File.AppendAllText(SETTINGS_FILE_NAME, JsonConvert.SerializeObject(coreSettings, Formatting.Indented));
             }
             else
             {
                 var readAllText = File.ReadAllText(SETTINGS_FILE_NAME);
-                CoreSettings = JsonConvert.DeserializeObject<CoreSettings>(readAllText);
+                CoreSettings = JsonConvert.DeserializeObject<CoreSettings>(readAllText) ?? new CoreSettings();
             }
 
             CurrentProfileName = CoreSettings.Profiles.Value;
@@ -89,11 +90,17 @@ public class SettingsContainer
         try
         {
             rwLock.EnterWriteLock();
-            var serializeObject = JsonConvert.SerializeObject(CoreSettings, Formatting.Indented);
-            var info = new FileInfo(SETTINGS_FILE_NAME);
-            if (info.Length > 1) File.Copy(SETTINGS_FILE_NAME, $"{CFG_DIR}\\dumpSettings.json", true);
-            File.WriteAllText(SETTINGS_FILE_NAME, serializeObject);
-            rwLock.ExitWriteLock();
+            try
+            {
+                var serializeObject = JsonConvert.SerializeObject(CoreSettings, Formatting.Indented);
+                var info = new FileInfo(SETTINGS_FILE_NAME);
+                if (info.Exists && info.Length > 1) File.Copy(SETTINGS_FILE_NAME, $"{CFG_DIR}\\dumpSettings.json", true);
+                File.WriteAllText(SETTINGS_FILE_NAME, serializeObject);
+            }
+            finally
+            {
+                rwLock.ExitWriteLock();
+            }
         }
         catch (Exception e)
         {
@@ -107,13 +114,17 @@ public class SettingsContainer
         if (plugin == null) return;
         if (string.IsNullOrWhiteSpace(CurrentProfileName)) CurrentProfileName = DEFAULT_PROFILE_NAME;
         rwLock.EnterWriteLock();
+        try
+        {
+            if (!Directory.Exists($"{CFG_DIR}\\{CurrentProfileName}")) Directory.CreateDirectory($"{CFG_DIR}\\{CurrentProfileName}");
 
-        if (!Directory.Exists($"{CFG_DIR}\\{CurrentProfileName}")) Directory.CreateDirectory($"{CFG_DIR}\\{CurrentProfileName}");
-
-        File.WriteAllText($"{CFG_DIR}\\{CurrentProfileName}\\{plugin.InternalName}_settings.json",
-            JsonConvert.SerializeObject(plugin._Settings, Formatting.Indented, jsonSettings));
-
-        rwLock.ExitWriteLock();
+            File.WriteAllText($"{CFG_DIR}\\{CurrentProfileName}\\{plugin.InternalName}_settings.json",
+                JsonConvert.SerializeObject(plugin._Settings, Formatting.Indented, jsonSettings));
+        }
+        finally
+        {
+            rwLock.ExitWriteLock();
+        }
     }
 
     /// <summary>Reads the raw JSON for the given plugin's settings, or null when absent or empty.</summary>
