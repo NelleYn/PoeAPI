@@ -1,3 +1,10 @@
+## 2026-07-12
+
+### Documentation
+
+- `96f5b21` docs(changelog): patch notes 2026-07-10 [skip ci]
+
+
 ## 2026-07-10
 
 ### Fixes
