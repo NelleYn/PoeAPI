@@ -126,6 +126,32 @@ public class Graphics
         ImGuiRender.LowLevelApi.AddLine(p1.ToVector2Num(), p2.ToVector2Num(), color.ToImgui(), borderWidth);
     }
 
+    /// <summary>
+    /// Draws a circle outline centered at <paramref name="center"/> as <paramref name="segments"/>
+    /// straight <see cref="DrawLine(Vector2N,Vector2N,float,Color)"/> segments (this fork has no
+    /// native circle primitive). More segments = smoother ring; clamped to a minimum of 3.
+    /// </summary>
+    public void DrawCircle(Vector2N center, float radius, Color color, float thickness, int segments)
+    {
+        if (segments < 3) segments = 3;
+        var step = 2f * System.MathF.PI / segments;
+        var prev = new Vector2N(center.X + radius, center.Y);
+        for (var i = 1; i <= segments; i++)
+        {
+            var angle = step * i;
+            var next = new Vector2N(center.X + radius * System.MathF.Cos(angle),
+                                    center.Y + radius * System.MathF.Sin(angle));
+            DrawLine(prev, next, thickness, color);
+            prev = next;
+        }
+    }
+
+    /// <summary>SharpDX-vector overload of <see cref="DrawCircle(Vector2N,float,Color,float,int)"/>.</summary>
+    public void DrawCircle(Vector2 center, float radius, Color color, float thickness, int segments)
+    {
+        DrawCircle(center.ToVector2Num(), radius, color, thickness, segments);
+    }
+
     /// <summary>Draws an outlined rectangle (frame). Overloads accept a rectangle or corner points.</summary>
     public void DrawFrame(Vector2N p1, Vector2N p2, Color color, float rounding, int thickness, int flags)
     {
