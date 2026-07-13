@@ -9,6 +9,10 @@ namespace ExileCore.PoEMemory.MemoryObjects
         private string id;
         private string name;
         public string Id => id != null ? id : id = M.ReadStringU(M.Read<long>(Address));
+        // Raw internal area id string (e.g. "1_1_town", "MapWorldsBeach"). Alias of Id for parity
+        // with upstream ExileApi-Compiled's WorldArea.RawName — both read the same memory as
+        // AreaTemplate.RawName (M.ReadStringU(M.Read<long>(Address))).
+        public string RawName => Id;
         public int Index { get; set; }
         public string Name => name != null ? name : name = M.ReadStringU(M.Read<long>(Address + 8), 255);
         public int Act => M.Read<int>(Address + 0x10);

@@ -45,6 +45,21 @@ namespace ExileCore.PoEMemory.MemoryObjects
         public InventoryElement InventoryPanel => GetObject<InventoryElement>(IngameUIElementsStruct.InventoryPanel);
         public Element TreePanel => GetObject<Element>(IngameUIElementsStruct.TreePanel);
         public Element AtlasPanel => GetObject<Element>(IngameUIElementsStruct.AtlasPanel);
+
+        // Upstream ExileApi-Compiled plugins reference IngameUi.Atlas for the Atlas-of-Worlds panel;
+        // this fork's verified offset is on AtlasPanel, so Atlas is an alias of it.
+        public Element Atlas => AtlasPanel;
+
+        // Player-to-player trade window and the NPC conversation dialog. Upstream plugins read these
+        // via IngameUi.TradeWindow / IngameUi.NpcDialog (only .IsVisible / .GetClientRect are used).
+        // This fork's IngameUElementsOffsets layout differs from the 328.8 reference and carries no
+        // verified field for either panel; pointing them at an unverified offset could misread a live
+        // pointer (spurious "panel open"), so until an offset is dumped for the target client they
+        // return null and callers using ?.IsVisible simply observe "not open". To enable: add the
+        // field to IngameUElementsOffsets and return GetObject<Element>(IngameUIElementsStruct.<field>).
+        public Element TradeWindow => null;
+        public Element NpcDialog => null;
+
         public Map Map => _map ?? (_map = GetObject<Map>(IngameUIElementsStruct.Map));
         public ItemsOnGroundLabelElement ItemsOnGroundLabelElement =>
             GetObject<ItemsOnGroundLabelElement>(IngameUIElementsStruct.itemsOnGroundLabelRoot);
