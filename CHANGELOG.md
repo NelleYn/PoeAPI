@@ -1,3 +1,11 @@
+## 2026-07-14
+
+### Other
+
+- `12ac887` Graphics: add DrawCircle (segmented ring via DrawLine)
+- `74de4e7` Expose ExileApi-Compiled API surface used by movement/helper plugins
+
+
 ## 2026-07-12
 
 ### Documentation
