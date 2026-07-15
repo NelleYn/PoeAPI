@@ -14,31 +14,52 @@ public partial class ImGuiHelpers
         }
     }
 
-    private static readonly DisposableAction PopOneStyleVar = new(() => ImGuiNET.ImGui.PopStyleVar(1));
-    private static readonly DisposableAction PopOneStyleColor = new(() => ImGuiNET.ImGui.PopStyleColor(1));
+    private sealed class StyleVarScope : System.IDisposable
+    {
+        private int _disposed;
+        public void Dispose()
+        {
+            if (System.Threading.Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                ImGuiNET.ImGui.PopStyleVar(1);
+            }
+        }
+    }
+
+    private sealed class StyleColorScope : System.IDisposable
+    {
+        private int _disposed;
+        public void Dispose()
+        {
+            if (System.Threading.Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                ImGuiNET.ImGui.PopStyleColor(1);
+            }
+        }
+    }
 
     public static System.IDisposable UseStyleVar(ImGuiNET.ImGuiStyleVar idx, System.Single val)
     {
         ImGuiNET.ImGui.PushStyleVar(idx, val);
-        return PopOneStyleVar;
+        return new StyleVarScope();
     }
 
     public static System.IDisposable UseStyleVar(ImGuiNET.ImGuiStyleVar idx, System.Numerics.Vector2 val)
     {
         ImGuiNET.ImGui.PushStyleVar(idx, val);
-        return PopOneStyleVar;
+        return new StyleVarScope();
     }
 
     public static System.IDisposable UseStyleColor(ImGuiNET.ImGuiCol idx, System.Numerics.Vector4 col)
     {
         ImGuiNET.ImGui.PushStyleColor(idx, col);
-        return PopOneStyleColor;
+        return new StyleColorScope();
     }
 
     public static System.IDisposable UseStyleColor(ImGuiNET.ImGuiCol idx, System.UInt32 col)
     {
         ImGuiNET.ImGui.PushStyleColor(idx, col);
-        return PopOneStyleColor;
+        return new StyleColorScope();
     }
 
     public static System.Boolean SetDragDropPayload<T>(System.String id, T payload)
