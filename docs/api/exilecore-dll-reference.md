@@ -84,11 +84,14 @@ source DLL` reads **531** across **208** files in the tree; `signature-only stub
 appear in **24** files — the doc's 25 counts the nested `ImguiVariadic`/`PluginCompiler`
 pair separately). 20 missing nested types were restored as `partial` extension files.
 
-Find remaining work:
+Find remaining work — note these greps target the **reconstruction branch**
+(`origin/claude/ecstatic-ritchie-cje3s8`, PR #18), not this repo's `Core/`, which contains
+no such stubs (if the ref is absent locally, fetch it first:
+`git fetch origin claude/ecstatic-ritchie-cje3s8`):
 
 ```
-grep -rn  "Body protected in source DLL" Core/   # stubbed individual methods
-grep -rln "signature-only stub"          Core/   # types recovered as signatures only
+git grep -n  "Body protected in source DLL" origin/claude/ecstatic-ritchie-cje3s8 -- Core/   # stubbed individual methods
+git grep -ln "signature-only stub"          origin/claude/ecstatic-ritchie-cje3s8 -- Core/   # types recovered as signatures only
 ```
 
 **○ Signature-only types (need the most attention):**

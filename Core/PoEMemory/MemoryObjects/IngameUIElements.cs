@@ -67,7 +67,13 @@ namespace ExileCore.PoEMemory.MemoryObjects
         public Element GemLvlUpPanel => GetObject<Element>(IngameUIElementsStruct.GemLvlUpPanel);
         public Element InvitesPanel => GetObject<Element>(IngameUIElementsStruct.InvitesPanel);
         public ItemOnGroundTooltip ItemOnGroundTooltip => GetObject<ItemOnGroundTooltip>(IngameUIElementsStruct.ItemOnGroundTooltip);
-        public MapStashTabElement MapStashTab => ReadObject<MapStashTabElement>(IngameUIElementsStruct.MapTabWindowStartPtr + 0xAA0);
+        // The map stash tab has no verified offset in this fork's IngameUElementsOffsets layout
+        // (see the note in that struct), so this returns null — the same convention as TradeWindow/
+        // NpcDialog above. The element is still reachable via Inventory.InventoryUIElement when
+        // InvType == InventoryType.MapStash. To enable: add MapTabWindowStartPtr to
+        // IngameUElementsOffsets and return
+        // ReadObject<MapStashTabElement>(IngameUIElementsStruct.MapTabWindowStartPtr + 0xAA0).
+        public MapStashTabElement MapStashTab => null;
         public Element Sulphit => GetObject<Element>(IngameUIElementsStruct.Map).GetChildAtIndex(0);
         public Cursor Cursor => _cursor ?? (_cursor = GetObject<Cursor>(IngameUIElementsStruct.Mouse));
         public Element BetrayalWindow => _BetrayalWindow ?? (_BetrayalWindow = GetObject<Element>(IngameUIElementsStruct.BetrayalWindow));
@@ -83,7 +89,11 @@ namespace ExileCore.PoEMemory.MemoryObjects
         public bool IsDndEnabled => M.Read<byte>(Address + 0xf92) == 1;
         public string DndMessage => M.ReadStringU(M.Read<long>(Address + 0xf98));
         public WorldMapElement AreaInstanceUi => GetObject<WorldMapElement>(IngameUIElementsStruct.AreaInstanceUi);
-        public WorldMapElement WorldMap => GetObject<WorldMapElement>(IngameUIElementsStruct.WorldMap);
+        // The world map has no verified offset in this fork's IngameUElementsOffsets layout (see
+        // the note in that struct), so this returns null — the same convention as TradeWindow/
+        // NpcDialog above; callers using ?.IsVisible observe "not open". To enable: add WorldMap to
+        // IngameUElementsOffsets and return GetObject<WorldMapElement>(IngameUIElementsStruct.WorldMap).
+        public WorldMapElement WorldMap => null;
         public MetamorphWindowElement MetamorphWindow => GetObject<MetamorphWindowElement>(IngameUIElementsStruct.MetamorphWindow);
 
         public IList<Tuple<Quest, int>> GetUncompletedQuests

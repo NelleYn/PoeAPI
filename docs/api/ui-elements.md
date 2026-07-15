@@ -123,7 +123,7 @@ Verified members (selected — see source for the full list):
 | `OpenRightPanel` | `Element` | Whatever panel is open on the right (inventory side). |
 | `TreePanel` | `Element` | The passive skill tree panel. |
 | `AtlasPanel` | `Element` | The Atlas panel. |
-| `WorldMap` | `WorldMapElement` | The world map (instance selection) UI. |
+| `WorldMap` | `WorldMapElement` | The world map (instance selection) UI. **Currently returns `null`** — no verified offset (see the note in `GameOffsets/IngameUElementsOffsets.cs`). |
 | `AreaInstanceUi` | `WorldMapElement` | The area/instance UI. |
 | `Map` | `Map` | The map element — both the large map and the minimap (see `Map` below). |
 | `ItemsOnGroundLabelElement` | `ItemsOnGroundLabelElement` | Container for ground-item labels. |
@@ -137,7 +137,8 @@ Verified members (selected — see source for the full list):
 | `DelveWindow` | `SubterraneanChart` | The Delve (Subterranean Chart) window. |
 | `IncursionWindow` | `IncursionWindow` | The Incursion window. |
 | `BetrayalWindow` / `SyndicateTree` | `Element` | Betrayal / syndicate UI. |
-| `SynthesisWindow`, `UnveilWindow`, `CraftBench`, `MetamorphWindow`, `MapStashTab`, `ZanaMissionChoice`, `QuestTracker`, `GemLvlUpPanel`, `InvitesPanel` | various | Other named windows/panels. |
+| `SynthesisWindow`, `UnveilWindow`, `CraftBench`, `MetamorphWindow`, `ZanaMissionChoice`, `QuestTracker`, `GemLvlUpPanel`, `InvitesPanel` | various | Other named windows/panels. |
+| `MapStashTab` | `MapStashTabElement` | **Currently returns `null`** — no verified offset (see the note in `GameOffsets/IngameUElementsOffsets.cs`). The element is still reachable via `Inventory.InventoryUIElement` — see [inventories.md](inventories.md). |
 | `GetUncompletedQuests`, `GetCompletedQuests`, `GetQuestStates` | quest collections | Quest tracking. |
 
 There is no `Atlas` or `WorldMap`-named property other than the two above
@@ -276,7 +277,9 @@ frame and item across inventory / ground / chat contexts.
 ### `WorldMapElement`
 
 `WorldMapElement.cs`. The world/area map UI. `Panel` returns the underlying panel
-element. Used for both `IngameUi.WorldMap` and `IngameUi.AreaInstanceUi`.
+element. Used for both `IngameUi.WorldMap` and `IngameUi.AreaInstanceUi` (note that
+`IngameUi.WorldMap` currently returns `null` — no verified offset; `AreaInstanceUi`
+is the working accessor).
 
 ### `PoeChatElement`
 

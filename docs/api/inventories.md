@@ -127,8 +127,12 @@ For all of these, do not rely on `InventPosX`/`InventPosY` — they are forced t
 ### MapStashTabElement — the map stash tab
 
 `MapStashTabElement` (same namespace) is a different shape: it is an `Element` that reads
-map counts rather than wrapping a single slot. It is what `Inventory.InventoryUIElement`
-resolves to when `InvType == InventoryType.MapStash`.
+map counts rather than wrapping a single slot. When `InvType == InventoryType.MapStash`,
+`Inventory.InventoryUIElement` returns its near-identical twin
+`ExileCore.PoEMemory.MemoryObjects.MapStashTabElement` (same members — cast to that type,
+not to the `InventoryElements` one documented here). Reach it that way:
+`IngameUi.MapStashTab` currently returns `null` because it has no verified offset in
+`GameOffsets/IngameUElementsOffsets.cs`.
 
 | Member | Type | Notes |
 | --- | --- | --- |

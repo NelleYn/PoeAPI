@@ -34,7 +34,12 @@ namespace GameOffsets
 		[FieldOffset(0x8E8)] public long GemLvlUpPanel;
 		[FieldOffset(0x8A0)] public long InvitesPanel;
 		[FieldOffset(0x990)] public long ItemOnGroundTooltip;
-		[FieldOffset(0x0/*0xCC0*/)] public long WorldMap;//TOFO: Fixme. Cause reading errors
-		[FieldOffset(0x0/*0xF18*/)] public long MapTabWindowStartPtr;//TOFO: Fixme. Cause reading errors
+		// WorldMap and MapTabWindowStartPtr were removed: there is no verified offset for either in
+		// this struct's client layout. The old candidates (WorldMap 0xCC0, MapTabWindowStartPtr
+		// 0xF18) caused reading errors, and they had been left as 0x0 placeholders that read
+		// garbage. The 328.8 layout (reconstruction branch, PR #18) has WorldMap at 0x680, but
+		// every dump-verified field there is shifted relative to this layout, so that value is not
+		// portable here. IngameUIElements.WorldMap / MapStashTab return null until offsets are
+		// dumped for the target client — re-add the fields here to enable them.
 	}
 }
