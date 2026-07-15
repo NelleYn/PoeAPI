@@ -2,14 +2,20 @@
 namespace ExileCore;
 public partial class SnapshotBuilder
 {
+    [System.Runtime.InteropServices.DllImport("ntdll.dll", EntryPoint = "NtSuspendProcess")]
+    private static extern System.Int32 NtSuspendProcessNative(nint processHandle);
+
+    [System.Runtime.InteropServices.DllImport("ntdll.dll", EntryPoint = "NtResumeProcess")]
+    private static extern System.Int32 NtResumeProcessNative(nint processHandle);
+
     public static System.Int32 NtSuspendProcess(nint processHandle)
     {
-        throw new global::System.NotImplementedException();
+        return NtSuspendProcessNative(processHandle);
     }
 
     public static System.Int32 NtResumeProcess(nint processHandle)
     {
-        throw new global::System.NotImplementedException();
+        return NtResumeProcessNative(processHandle);
     }
 
     public System.Collections.Generic.SortedList<System.Int64, System.Byte[]> GetSnapshot(System.Boolean freezeProcess)
