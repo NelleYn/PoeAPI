@@ -1,29 +1,13 @@
-// NOTE: full implementation not recoverable from the protected DLL; emitted as a signature-only stub.
 namespace ExileCore;
 public partial interface IInputManager
 {
-    public ExileCore.IStatusDisposable BlockUserMouseInput()
-    {
-        throw new global::System.NotImplementedException();
-    }
+    ExileCore.IStatusDisposable BlockUserMouseInput();
 
-    public ExileCore.IStatusDisposable BlockUserKeyboardInput()
-    {
-        throw new global::System.NotImplementedException();
-    }
+    ExileCore.IStatusDisposable BlockUserKeyboardInput();
 
-    public System.Boolean MoveMouse(System.Numerics.Vector2 coordinate)
-    {
-        throw new global::System.NotImplementedException();
-    }
+    System.Boolean MoveMouse(System.Numerics.Vector2 coordinate);
 
-    public System.Threading.Tasks.Task<System.Boolean> MoveMouseAsync(ExileCore.MouseMoveStroke stroke, System.Threading.CancellationToken cancellationToken)
-    {
-        throw new global::System.NotImplementedException();
-    }
+    System.Threading.Tasks.Task<System.Boolean> MoveMouseAsync(ExileCore.MouseMoveStroke stroke, System.Threading.CancellationToken cancellationToken);
 
-    public ExileCore.Shared.SyncTask<System.Boolean> MoveMouseSyncTask(ExileCore.MouseMoveStroke stroke, System.Threading.CancellationToken cancellationToken)
-    {
-        throw new global::System.NotImplementedException();
-    }
+    ExileCore.Shared.SyncTask<System.Boolean> MoveMouseSyncTask(ExileCore.MouseMoveStroke stroke, System.Threading.CancellationToken cancellationToken);
 }

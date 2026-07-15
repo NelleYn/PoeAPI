@@ -27,4 +27,14 @@ public class DefaultInputManager : IInputManager
     {
         throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
     }
+
+    public virtual System.Threading.Tasks.Task<bool> MoveMouseAsync(MouseMoveStroke stroke, System.Threading.CancellationToken cancellationToken)
+    {
+        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
+    }
+
+    public virtual ExileCore.Shared.SyncTask<bool> MoveMouseSyncTask(MouseMoveStroke stroke, System.Threading.CancellationToken cancellationToken)
+    {
+        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
+    }
 }
