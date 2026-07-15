@@ -8,12 +8,14 @@ public partial class PluginAssemblyLoadContext
     public System.Int32 _unloadState;
     public System.Reflection.Assembly ResolvingCallback(System.Runtime.Loader.AssemblyLoadContext context, System.Reflection.AssemblyName assemblyName)
     {
-        throw new global::System.NotImplementedException();
+        var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
+        return assemblyPath != null ? context.LoadFromAssemblyPath(assemblyPath) : null;
     }
 
     public nint ResolvingUnmanagedDllCallback(System.Reflection.Assembly assembly, System.String dllName)
     {
-        throw new global::System.NotImplementedException();
+        var libraryPath = _resolver.ResolveUnmanagedDllToPath(dllName);
+        return libraryPath != null ? System.Runtime.InteropServices.NativeLibrary.Load(libraryPath) : System.IntPtr.Zero;
     }
 
     public void UnloadOnce()
