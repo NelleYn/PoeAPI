@@ -14,24 +14,52 @@ public partial class ImGuiHelpers
         }
     }
 
+    private sealed class StyleVarScope : System.IDisposable
+    {
+        private int _disposed;
+        public void Dispose()
+        {
+            if (System.Threading.Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                ImGuiNET.ImGui.PopStyleVar(1);
+            }
+        }
+    }
+
+    private sealed class StyleColorScope : System.IDisposable
+    {
+        private int _disposed;
+        public void Dispose()
+        {
+            if (System.Threading.Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                ImGuiNET.ImGui.PopStyleColor(1);
+            }
+        }
+    }
+
     public static System.IDisposable UseStyleVar(ImGuiNET.ImGuiStyleVar idx, System.Single val)
     {
-        throw new global::System.NotImplementedException();
+        ImGuiNET.ImGui.PushStyleVar(idx, val);
+        return new StyleVarScope();
     }
 
     public static System.IDisposable UseStyleVar(ImGuiNET.ImGuiStyleVar idx, System.Numerics.Vector2 val)
     {
-        throw new global::System.NotImplementedException();
+        ImGuiNET.ImGui.PushStyleVar(idx, val);
+        return new StyleVarScope();
     }
 
     public static System.IDisposable UseStyleColor(ImGuiNET.ImGuiCol idx, System.Numerics.Vector4 col)
     {
-        throw new global::System.NotImplementedException();
+        ImGuiNET.ImGui.PushStyleColor(idx, col);
+        return new StyleColorScope();
     }
 
     public static System.IDisposable UseStyleColor(ImGuiNET.ImGuiCol idx, System.UInt32 col)
     {
-        throw new global::System.NotImplementedException();
+        ImGuiNET.ImGui.PushStyleColor(idx, col);
+        return new StyleColorScope();
     }
 
     public static System.Boolean SetDragDropPayload<T>(System.String id, T payload)
