@@ -8,12 +8,32 @@ public partial class PluginAssemblyLoadContext
     public System.Int32 _unloadState;
     public System.Reflection.Assembly ResolvingCallback(System.Runtime.Loader.AssemblyLoadContext context, System.Reflection.AssemblyName assemblyName)
     {
-        throw new global::System.NotImplementedException();
+        try
+        {
+            // When wired to the plugin ALC's Resolving event, `context` is that plugin ALC,
+            // so the dependency is loaded into the plugin's own (collectible) context.
+            var assemblyPath = _resolver?.ResolveAssemblyToPath(assemblyName);
+            return assemblyPath != null ? context.LoadFromAssemblyPath(assemblyPath) : null;
+        }
+        catch
+        {
+            // A Resolving handler must not throw; returning null lets resolution fall through.
+            return null;
+        }
     }
 
     public nint ResolvingUnmanagedDllCallback(System.Reflection.Assembly assembly, System.String dllName)
     {
-        throw new global::System.NotImplementedException();
+        try
+        {
+            var libraryPath = _resolver?.ResolveUnmanagedDllToPath(dllName);
+            return libraryPath != null ? System.Runtime.InteropServices.NativeLibrary.Load(libraryPath) : System.IntPtr.Zero;
+        }
+        catch
+        {
+            // A ResolvingUnmanagedDll handler must not throw; IntPtr.Zero lets default probing continue.
+            return System.IntPtr.Zero;
+        }
     }
 
     public void UnloadOnce()
