@@ -5,6 +5,6 @@ public class AtlasPrimordialAltarChoiceType : RemoteMemoryObject
 
     public override string ToString()
     {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
+        return Id;
     }
 }
