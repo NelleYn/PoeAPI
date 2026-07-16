@@ -2,6 +2,15 @@
 
 _Сгенерировано автоматически: 214 идей (цель — 200), из них отобрано 35 лучших._
 
+## Статус выполнения (сверка 2026-07-16)
+
+Пункты раздела «Топ» сверены с фактическим кодом в ветке `master`. Планы **не мёрджились** — это независимая разработка, совпавшая с предложениями.
+
+- ✅ Сделано: 5
+- 🟡 Частично: 1
+- ⬜ Не реализовано: 29
+- ❓ Не удалось проверить: 0
+
 ## О проекте
 
 ExileApi (сборка `ExileCore`) — приватный форк PoeHud: Windows-only HUD/overlay-фреймворк для Path of Exile на **C# / .NET 10** (`net10.0-windows`, x64). Приложение отдельным процессом читает память игры в режиме read-only, интерпретирует её как типизированные объекты (`Core/PoEMemory/**`), кэширует чтения (`Core/Shared/Cache/**`) и рисует оверлей поверх окна игры через DirectX 11 + ImGui (`Core/RenderQ/**`). Плагины (`Plugins/Compiled/**`, `Plugins/Source/**`) загружаются и компилируются в рантайме через Roslyn (`Core/Shared/RoslynCompiler.cs`, `PluginManager.cs`). Три проекта: `GameOffsets` (структуры под сырую память), `Core` (движок, namespace `ExileCore`), `Loader` (точка входа, Windows Forms + DX11-окно). Многопоточность реализована собственным пулом (`Core/MultiThreadManager.cs`) и корутинами (`Core/Shared/Runner.cs`, `Coroutine.cs`).
@@ -11,176 +20,281 @@ ExileApi (сборка `ExileCore`) — приватный форк PoeHud: Wind
 ## Топ 35: приоритетные улучшения
 
 ### 1. `Thread.Abort()` падает на .NET 10
+
+> ✅ **Статус (2026-07-16):** Сделано. Коммит 9bd9176 переписал `MultiThreadManager.cs`: `ForceAbort()` теперь вызывает кооперативный `Abort()` (помечает Job/SecondJob завершёнными, `running=false`, сигналит `_event`) вместо `thread.Abort()`; заодно исправлен copy-paste баг с `SecondJob.IsFailed` и `running` сделан volatile.
+
 - **Категория:** Bugs / correctness
 - **Impact:** High **Effort:** S
 - **Обоснование:** `ThreadUnit.ForceAbort()` (`Core/MultiThreadManager.cs:455`) вызывает `thread.Abort()` на `System.Threading.Thread`. Начиная с .NET 5 `Thread.Abort()` бросает `PlatformNotSupportedException`, а проект таргетит `net10.0-windows`. Механизм «починки» зависших воркеров при срабатывании выкинет исключение вместо восстановления потока. Нужен кооперативный останов (флаг + `CancellationToken`).
 
 ### 2. Падение при первом запуске: `CoreSettings` остаётся null
+
+> ✅ **Статус (2026-07-16):** Сделано. Коммит 59fd739: в `Core/SettingsContainer.cs` `LoadCoreSettings()` присваивает `CoreSettings = coreSettings` до использования, поэтому `CurrentProfileName = CoreSettings.Profiles.Value` больше не даёт NRE при первом запуске.
+
 - **Категория:** Bugs / correctness
 - **Impact:** High **Effort:** S
 - **Обоснование:** В `SettingsContainer.LoadCoreSettings()` (`Core/SettingsContainer.cs:67-78`) при отсутствии файла создаётся локальный `coreSettings`, пишется на диск, но поле `CoreSettings` не присваивается; следующая строка `CurrentProfileName = CoreSettings.Profiles.Value` даёт NRE. Ошибка гасится в `Console.WriteLine`, после чего `Core` получает `CoreSettings == null` и падает каскадом. Чистая установка не стартует.
 
 ### 3. Утечка write-lock в `SettingsContainer` (потенциальный дедлок)
+
+> ✅ **Статус (2026-07-16):** Сделано. Тот же коммит 59fd739: `SaveCoreSettings()` и `SaveSettings()` оборачивают запись в `try/finally` c `EnterWriteLock`/`ExitWriteLock`.
+
 - **Категория:** Bugs / correctness
 - **Impact:** High **Effort:** S
 - **Обоснование:** `SaveCoreSettings` (`:91-96`) и `SaveSettings` (`:109-116`) вызывают `rwLock.EnterWriteLock()` без `try/finally`. Любое исключение при сериализации/`File.WriteAllText` оставляет lock захваченным — все последующие сохранения виснут навсегда. Обернуть в `try/finally`.
 
 ### 4. Рассинхрон имён файлов настроек: `Name` vs `InternalName`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** High **Effort:** S
 - **Обоснование:** `SaveSettings` пишет в `{plugin.InternalName}_settings.json` (`Core/SettingsContainer.cs:113`), а `LoadSettings` читает из `{plugin.Name}_settings.json` (`:125`). В `BaseSettingsPlugin` `Name` — сеттабельное свойство, часто отличное от `InternalName` (= namespace). Если плагин задал кастомное `Name`, настройки сохраняются, но не загружаются. Использовать один ключ.
 
 ### 5. Пропуск корутин при удалении в `Runner`
+
+> ✅ **Статус (2026-07-16):** Сделано. Коммит f9e8ec8 заменил `Coroutines.Remove(coroutine)` на `Coroutines.RemoveAt(i); i--;` в `Update()` и `ParallelUpdate()` (`Core/Shared/Runner.cs`).
+
 - **Категория:** Bugs / correctness
 - **Impact:** High **Effort:** S
 - **Обоснование:** `Runner.Update()` и `ParallelUpdate()` (`Core/Shared/Runner.cs:140-181`, `:195-238`) итерируются по индексу `for(i…)` и в той же итерации делают `Coroutines.Remove(coroutine)`. После удаления элемента индексы смещаются, и следующая корутина пропускается в этом кадре. Итерировать копию или идти с конца.
 
 ### 6. `Coroutine.OwnerName` всегда «Free»
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** Med **Effort:** S
 - **Обоснование:** В приватном конструкторе (`Core/Shared/Coroutine.cs:14-19`) `OwnerName` вычисляется из свойства `Owner` (ещё null на этом этапе), а не из параметра `owner`. В итоге весь диагностический вывод по корутинам показывает «Free» вместо namespace владельца — теряется привязка проблемных корутин к плагину.
 
 ### 7. `Runner.Coroutines` — неблокирующий `List`, читаемый/мутируемый из нескольких потоков
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Concurrency / thread-safety
 - **Impact:** High **Effort:** M
 - **Обоснование:** `ParallelUpdate` (`Runner.cs:195-247`) раздаёт `coroutine.MoveNext()` в воркер-потоки через `MultiThreadManager`, одновременно делая `Coroutines.Add/Remove` и обходя список. `List<Coroutine>` не потокобезопасен: возможны пропуски, `IndexOutOfRange` и порча состояния. Нужен снапшот на кадр или конкурентная структура.
 
 ### 8. Однопоточная ветка `MultiThreadManager.Process` теряет починенный поток
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** Med **Effort:** S
 - **Обоснование:** В ветке `else` (`Core/MultiThreadManager.cs:251-256`) при `ThreadsCount == 1` создаётся новый `ThreadUnit` в локальную переменную `threadUnit`, но он не записывается обратно в `threads[0]` и не попадает в `FreeThreads`. После первой «починки» пул из одного потока деградирует.
 
 ### 9. `ExileApi.sln` ссылается на gitignore-нутые проекты плагинов
+
+> ✅ **Статус (2026-07-16):** Сделано. Коммит 344f2aa убрал gitignore-нутые плагин-проекты из `ExileApi.sln` (документировано в e4e29b0); теперь решение перечисляет только Loader, Core и GameOffsets.
+
 - **Категория:** Config / build
 - **Impact:** High **Effort:** S
 - **Обоснование:** Решение перечисляет ~17 проектов `Plugins/Source/*/*.csproj`, а `.gitignore` целиком игнорирует `Plugins/`. На свежем клоне этих файлов нет, поэтому `dotnet build -c Release ExileApi.sln` (главная команда из README) падает. Нужно отвязать плагины от `.sln` (solution filter) или не игнорировать примеры.
 
 ### 10. Нет CI
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Tests & CI
 - **Impact:** High **Effort:** M
 - **Обоснование:** Каталог `.github/` отсутствует. Даже без игры Windows-раннер GitHub Actions может собирать `Loader/Loader.csproj` (тянет `Core` и `GameOffsets`) и ловить регрессии компиляции — критично для проекта, где плагины компилируются против `ExileCore.dll`.
 
 ### 11. Нет модульных тестов на чистую логику
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Tests & CI
 - **Impact:** High **Effort:** M
 - **Обоснование:** В репозитории ноль тестов. Не зависящие от игры части — `RoslynCompiler`, кэши (`Cache/*`), `TypeConverter`, `MathHepler`, парсер паттернов `Memory.FindPatterns/CompareData`, `SettingsParser` — тестируются на любой ОС. Дают быструю защиту от регрессий вроде находок №2–8.
 
 ### 12. Удалить финализатор `CachedValue`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Performance
 - **Impact:** High **Effort:** S
 - **Обоснование:** `~CachedValue()` (`Core/Shared/Cache/CachedValue.cs:102-105`) существует лишь чтобы декрементировать счётчик `LifeCount`. Каждый кэш-объект (а их тысячи на сущность/кадр) попадает в очередь финализации → лишний проход GC и давление на память. Заменить на `IDisposable` или убрать счётчик.
 
 ### 13. `Input.IsKeyDown` бросает `KeyNotFoundException`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** Med **Effort:** S
 - **Обоснование:** `IsKeyDown(Keys)` (`Core/Input.cs:67-75`) под `#if DebugKeys` логирует незарегистрированную клавишу, но всё равно выполняет `return Keys[nVirtKey]`, что бросает исключение на отсутствующем ключе. Плагин, забывший `RegisterKey`, роняет тик. Использовать `TryGetValue` с `false` по умолчанию.
 
 ### 14. Не проверяется результат `ReadProcessMemory` (дрейф оффсетов не виден)
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** High **Effort:** M
 - **Обоснование:** `Memory.Read<T>` (`Core/Memory.cs:274-285`) и `ReadMem` (`:107-122`) игнорируют возвращаемое значение/число прочитанных байт `ProcessMemory.ReadProcessMemory(Array)`. Частичное или неуспешное чтение молча даёт `default`/мусорную структуру — после патча игры оффсеты «плывут» без единого сигнала. Проверять успех и логировать через Serilog.
 
 ### 15. `ReadMem` перебрасывает исключение вопреки контракту «best-effort»
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Error handling & logging
 - **Impact:** Med **Effort:** S
 - **Обоснование:** Docstring `Memory` обещает «best-effort, defaults/empty on invalid». Но `ReadMem(IntPtr,size)` (`:117-121`) в `catch` делает `throw;`, и одно плохое чтение в цикле (например, в `ReadStructsArray`) валит весь тик через `Core.Tick` catch. Вернуть пустой буфер согласно контракту.
 
 ### 16. `RangeNode<long>` обрезается до `int` в меню
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** Med **Effort:** S
 - **Обоснование:** В `SettingsParser` (`Core/SettingsParser.cs:229-236`) ветка `RangeNode<long>` делает `(int) n.Value`, `(int) n.Min`, `(int) n.Max` и рисует `SliderInt`. Значения вне диапазона `int` ломаются/переполняются. Использовать корректный виджет для long.
 
 ### 17. Случайные ID пунктов меню могут коллизиться
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** Med **Effort:** S
 - **Обоснование:** При `menuAttribute.index == -1` ID берётся как `MathHepler.Randomizer.Next(int.MaxValue)` (`SettingsParser.cs:54`). Совпадение ID двух холдеров ломает поиск родителя (`Find(x => x.ID == parentIndex)`) и вложенность меню. Использовать детерминированный монотонный счётчик.
 
 ### 18. Уйти с устаревшего `Serilog.Sinks.RollingFile` и обновить Serilog
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Dependencies & maintenance
 - **Impact:** Med **Effort:** S
 - **Обоснование:** `Core.csproj`/`Loader.csproj` тянут `Serilog 2.8.0` (очень старый) и одновременно `Serilog.Sinks.RollingFile 3.3.0` (архивирован, deprecated) вместе с `Serilog.Sinks.File`. RollingFile убрать, файловый роллинг делать через `Serilog.Sinks.File`, поднять Serilog до 3.x/4.x.
 
 ### 19. Централизованное управление версиями пакетов
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Config / build
 - **Impact:** Med **Effort:** S
 - **Обоснование:** SharpDX 4.2.0 и Serilog-пакеты продублированы в `Core.csproj` и `Loader.csproj` (`Directory.Build.props` их не задаёт). Ввести `Directory.Packages.props` с `ManagePackageVersionsCentrally` — исключит расхождение версий между проектами.
 
 ### 20. Единый канал логирования
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Error handling & logging
 - **Impact:** Med **Effort:** M
 - **Обоснование:** Ошибки размазаны по трём каналам: `Core.Logger`/`Logger.Log` (Serilog), `DebugWindow.LogError` (оверлей) и `Console.WriteLine` (`Runner.cs:160-170`, `SettingsContainer.cs:82,100`). Часть ошибок вообще не попадает в файл-лог. Свести к Serilog + прокидывать в `DebugWindow` для UI. Заодно убрать диагностику `"WTF {type}"` (`MultiThreadManager.cs:158`).
 
 ### 21. Не глотать ошибки загрузки ссылок в `RoslynCompiler`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Error handling & logging
 - **Impact:** Med **Effort:** S
 - **Обоснование:** `BuildReferences` (`Core/Shared/RoslynCompiler.cs:167-168`) делает `catch { }` при `CreateFromFile`. Если ключевая сборка не подгрузилась, плагин упадёт на непонятных ошибках компиляции «type not found». Логировать пропущенные ссылки.
 
 ### 22. Вызывать `Core` напрямую вместо reflection в `Loader`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Architecture / refactor
 - **Impact:** Med **Effort:** M
 - **Обоснование:** `Loader.cs` делает `Assembly.Load("ExileCore")` и дёргает `Render`/`Dispose`/`FixImGui` через `GetMethod(...).Invoke` в цикле рендера (`:128-142`), хотя есть `ProjectReference` на `Core`. Reflection в hot-path хрупок (ломается при переименовании) и медленнее. Заменить на прямые вызовы.
 
 ### 23. Дубли текстур `textures/` и `Core/textures/`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Developer experience / tooling
 - **Impact:** Low **Effort:** S
 - **Обоснование:** По 33 одинаковых PNG в корневом `textures/` и в `Core/textures/`; в вывод копируется только `Core/textures/**` (`Core.csproj`). Корневая копия — мёртвый вес и риск рассинхрона. Оставить один источник.
 
 ### 24. Добавить LICENSE и прояснить лицензию форка
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Documentation
 - **Impact:** High **Effort:** S
 - **Обоснование:** Файла LICENSE нет, а это «private fork of PoeHud» (README). Без явной лицензии правовой статус переиспользования и вклада плагинов неясен. Добавить LICENSE, совместимый с апстримом.
 
 ### 25. Предупреждение об анти-чите/ToS в README
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Security
 - **Impact:** Med **Effort:** S
 - **Обоснование:** Инструмент читает память чужого процесса и шлёт синтетический ввод (`mouse_event`/`keybd_event` в `Input.cs`) — ровно то, что детектят анти-читы, и что нарушает ToS GGG. В README/доках нет предупреждения о рисках блокировки. Добавить явную секцию.
 
 ### 26. Переписать статус/сборку в README
+
+> 🟡 **Статус (2026-07-16):** Частично. Добавлена секция «For developers» с корректной командой сборки (`dotnet build -c Release ExileApi.sln`), которая после фикса .sln (344f2aa) работает; но два H1 подряд и фраза «Current version can lags and crash...» в README не переписаны.
+
 - **Категория:** Documentation
 - **Impact:** Med **Effort:** S
 - **Обоснование:** README открывается двумя H1 подряд и фразой «Current version can lags and crash because i didn't test that a lot time». Плюс рекомендованная команда `dotnet build ExileApi.sln` не работает (см. №9). Дать корректный quickstart (собирать `Loader/Loader.csproj`).
 
 ### 27. Перейти на `SendInput` вместо legacy `keybd_event`/`mouse_event`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** Med **Effort:** M
 - **Обоснование:** `Input.cs` использует `WinApi.keybd_event`/`mouse_event` (устаревшие с 20 лет, документированы как «superseded by SendInput»). Они не атомарны, хуже работают с абсолютными координатами/несколькими мониторами и легче фильтруются. `SendInput` надёжнее и группирует события.
 
 ### 28. Оптимизировать `FindPatterns`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Performance
 - **Impact:** Med **Effort:** M
 - **Обоснование:** `Memory.FindPatterns` (`Core/Memory.cs:373-442`) целиком копирует ~33 МБ образа модуля в managed `byte[]` и делает наивный побайтовый скан на каждый паттерн. Использовать `Span<byte>`/`IndexOf` или Boyer–Moore и переиспользовать буфер — заметно ускорит холодный старт HUD.
 
 ### 29. Создавать каталог `Logs` перед fallback-записью
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** Low **Effort:** S
 - **Обоснование:** `Loader.LogLoaderError` при отсутствии логгера пишет в `Logs\Loader.txt` через `File.WriteAllText` (`Loader/Loader.cs:179`), не создавая каталог. Если `Logs/` нет, аварийное логирование само бросает `DirectoryNotFoundException`, скрывая исходную ошибку.
 
 ### 30. Модель доверия и allowlist для плагинов
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Security
 - **Impact:** Med **Effort:** L
 - **Обоснование:** `PluginManager`/`RoslynCompiler` грузят произвольные DLL и компилируют исходники с полным доверием, `AllowUnsafe`, ссылками на все TPA и любые `libs/*.dll`. Плагин получает права на чтение памяти игры и синтетический ввод. Минимум — задокументировать риск, в идеале — allowlist ссылок и проверка происхождения.
 
 ### 31. Исправить страж переполнения в `ReadStructsArray`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Bugs / correctness
 - **Impact:** Low **Effort:** S
 - **Обоснование:** В `Memory.ReadStructsArray` (`Core/Memory.cs:156-160`) при `i > 100000` код только логирует, но не делает `break` — цикл продолжается до `endAddress`, добавляя мусорные объекты. Прерывать чтение.
 
 ### 32. Инкрементально включить Nullable reference types
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Architecture / refactor
 - **Impact:** Med **Effort:** L
 - **Обоснование:** Во всех csproj `Nullable=disable`, при том что кодовая база полна возвращающих null указателей и `GetObject<T>`/`GetComponent<T>`. Включение (хотя бы `annotations`) в новых файлах ловит целый класс NRE вроде находки №2 на этапе компиляции.
 
 ### 33. Разнести/сгенерировать `GameStat.cs`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Performance
 - **Impact:** Med **Effort:** M
 - **Обоснование:** `Core/Shared/Enums/GameStat.cs` — 53 071 строка одного enum (сравнимо со всей остальной кодовой базой ~34k). Замедляет компиляцию и IDE, раздувает метаданные сборки. Генерировать из данных/ресурса или разбить, оставив только используемые значения.
 
 ### 34. Добавить `global.json` для фиксации SDK
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Config / build
 - **Impact:** Low **Effort:** S
 - **Обоснование:** Нет `global.json`, фиксирующего версию .NET 10 SDK. Для проекта с рантайм-компиляцией через Roslyn различие версий SDK у разработчиков/CI ведёт к «у меня собирается, у тебя нет». Закрепить SDK.
 
 ### 35. Переименовать публичный `MathHepler` → `MathHelper`
+
+> ⬜ **Статус (2026-07-16):** Не реализовано.
+
 - **Категория:** Architecture / refactor
 - **Impact:** Low **Effort:** M
 - **Обоснование:** Опечатка в имени публичного класса `Core/Shared/Helpers/MathHepler.cs` тиражируется по всей базе (`SettingsParser`, `Coroutine` и др.) и попадает в API, которым пользуются плагины. Переименовать с сохранением обёртки-`[Obsolete]` для совместимости плагинов.
