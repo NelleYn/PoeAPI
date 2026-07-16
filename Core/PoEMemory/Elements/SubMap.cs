@@ -24,6 +24,7 @@ public class SubMap : Element
 
     static SubMap()
     {
-        throw new global::System.NotImplementedException("Body protected in source DLL; not recoverable.");
+        CameraAngleCos = (float)Math.Cos(CameraAngle);
+        CameraAngleSin = (float)Math.Sin(CameraAngle);
     }
 }
