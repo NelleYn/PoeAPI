@@ -1,3 +1,11 @@
+## 2026-07-17
+
+### Other
+
+- `cd9ed62` Port master-compatible types from the reconstruction: ActionOverlay, PluginAssemblyLoadContext, ImGuiHelpers scopes
+- `2ae08e2` Resolve the last unfinished API leftovers: unresolved UI offsets and stale docs
+
+
 ## 2026-07-14
 
 ### Other
