@@ -1,3 +1,10 @@
+## 2026-07-23
+
+### Chores
+
+- `c96d27c` chore: annotate IMPROVEMENTS.md with implementation status (verified 2026-07-16)
+
+
 ## 2026-07-17
 
 ### Other
