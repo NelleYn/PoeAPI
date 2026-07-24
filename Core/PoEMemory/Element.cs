@@ -258,6 +258,46 @@ public class Element : RemoteMemoryObject
         return poe_UElement;
     }
 
+    /// <summary>
+    /// Walks the element tree following the given sequence of child indices, without logging when the
+    /// path does not resolve.
+    /// </summary>
+    /// <param name="element">
+    /// The resolved element, or <c>null</c> when an index along the path does not exist or lands on a
+    /// zero address.
+    /// </param>
+    /// <param name="indices">The chain of child indices to follow.</param>
+    /// <returns><c>true</c> when the whole path resolved to a usable element; otherwise <c>false</c>.</returns>
+    /// <remarks>
+    /// The quiet counterpart to <see cref="GetChildFromIndices"/>, which writes a
+    /// <c>DebugWindow.LogMsg</c> for every miss. Plugins probe UI paths speculatively — the upstream
+    /// call site sweeps 20 candidate indices in a loop — so a probing API must not spam the log; that
+    /// is the whole reason this overload exists rather than being a thin wrapper.
+    /// <para>
+    /// It also differs on the zero-address case: <see cref="GetChildFromIndices"/> returns a wrapper
+    /// around address 0, whereas this reports failure and yields <c>null</c>, so a truthy result always
+    /// means a real element.
+    /// </para>
+    /// </remarks>
+    public bool TryGetChildFromIndices(out Element element, params int[] indices)
+    {
+        var current = this;
+
+        foreach (var index in indices)
+        {
+            current = current.GetChildAtIndex(index);
+
+            if (current == null || current.Address == 0)
+            {
+                element = null;
+                return false;
+            }
+        }
+
+        element = current;
+        return element != null;
+    }
+
     /// <summary>Gets the child element at the given index.</summary>
     /// <param name="index">The zero-based index of the child to retrieve.</param>
     /// <returns>The child element, or <c>null</c> when the index is out of range.</returns>

@@ -142,10 +142,22 @@ Quests: `QuestFlagDat`, `QuestFlagsDat`, `QuestReward(+Offer)`. Mechanic tables:
 `JsonSerializationHelper`. This fork ships `Toggle/Range/Hotkey/Color/Button/List/Text/File/
 StashTab/Empty/Custom` — see [settings.md](settings.md).
 
-### Shared/Attributes (2 absent)
+### Shared/Attributes (2 absent) — **the highest-traffic gap in this document**
 
 `SubmenuAttribute` (`[Submenu]`), `ConditionalDisplayAttribute` (`[ConditionalDisplay]`).
 This fork has only `[Menu]` and `[HideInReflection]`.
+
+The 2026-07-24 re-sweep of the 45-plugin corpus found `[Submenu]` in **17 repos** and
+`[ConditionalDisplay]` in **8** — second and third only to `[Menu]` (25). A plugin using
+`[Submenu]` does not compile here at all, so this single missing attribute blocks more straight
+ports than every offset gap in this document combined.
+
+Neither is restorable from the reconstruction: it decompiles them to non-functional bodies
+(`ConditionalDisplayAttribute.ConditionMethodName` becomes `return (string)(object)this;`,
+`SubmenuAttribute`'s constructor to three discarded constants). The attribute *shapes* are easy
+to rewrite, but an attribute with no matching `SettingsParser`/`MenuWindow` support is inert —
+it would compile and then silently do nothing, which is worse than a compile error. Closing this
+gap means implementing the menu behaviour, not just declaring the types.
 
 ### Shared/Enums (8 absent)
 
@@ -217,7 +229,7 @@ site; the *This fork* column names the in‑repo equivalent (file cited where no
 | --- | --- | --- | --- |
 | `Mods.ImplicitMods` : `List<ItemMod>` | `Mods.ImplicitMods()` extension | compat‑helper | `gcv/Ninja Price/Main/CustomItem.cs:196`. `Core/Shared/Compat/ComponentCompat.cs` walks `ModsStruct.implicitMods` with the same stride/guard as the fork's private `Mods.GetMods`; `Mods.ItemMods` remains the combined list. |
 | `Mods.ExplicitMods` : `List<ItemMod>` | `Mods.ExplicitMods()` extension | compat‑helper | `gcv/.../CustomItem.cs:194`. Same helper family over `ModsStruct.explicitMods` (`Core/Shared/Compat/ComponentCompat.cs`). |
-| `Mods.EnchantedMods` : `List<ItemMod>` | `Mods.EnchantedMods()` extension | compat‑helper | `stashie/ItemData.cs:109` `modsComp?.EnchantedMods?.Count`. `Core/Shared/Compat/ComponentCompat.cs` walks `ModsStruct.enchantedMods` with the same stride/guard as `ImplicitMods`/`ExplicitMods`. The backing offset (`0xC0`, `GameOffsets/ModsComponentOffsets.cs`) is **derived, not dumped**: `ModsAndObjectMagicPropertiesCommonStruct` documents the implicit/explicit/enchantment arrays at `0x60`/`0x78`/`0x90` plus the rule "add `0x30` from the Mods component", which reproduces `UniqueName`/`Identified`/`ItemRarity`/`implicitMods`/`explicitMods` exactly; `0x18`-byte array contiguity gives the same answer. A wrong offset degrades to an empty list, never fabricated mods. |
+| `Mods.EnchantedMods` : `List<ItemMod>` | `Mods.EnchantedMods()` extension | compat‑helper | ⚠️ The citation `stashie/ItemData.cs:109` is **stale** — the 2026‑07‑24 re‑sweep found DetectiveSquirrel/Stashie @ `bd4a111` has no `ItemData.cs` and no `Mods` usage, and **0 of the 45** audited repos reference `EnchantedMods`. It is still a genuine ExileApi‑Compiled member, so the helper stands, but no plugin in the corpus currently exercises it. `Core/Shared/Compat/ComponentCompat.cs` walks `ModsStruct.enchantedMods` with the same stride/guard as `ImplicitMods`/`ExplicitMods`. The backing offset (`0xC0`, `GameOffsets/ModsComponentOffsets.cs`) is **derived, not dumped**: `ModsAndObjectMagicPropertiesCommonStruct` documents the implicit/explicit/enchantment arrays at `0x60`/`0x78`/`0x90` plus the rule "add `0x30` from the Mods component", which reproduces `UniqueName`/`Identified`/`ItemRarity`/`implicitMods`/`explicitMods` exactly; `0x18`-byte array contiguity gives the same answer. A wrong offset degrades to an empty list, never fabricated mods. |
 | `Mods.IncubatorName` | — | missing | No incubator member on fork `Mods`. |
 | `Stack.MaxSize` | `Stack.MaxSize()` extension | compat‑helper | `Core/PoEMemory/Components/Stack.cs` exposes `Size` and `Info`; the helper (`Core/Shared/Compat/ComponentCompat.cs`) reads `Stack.Info.MaxStackSize` via `CurrencyInfo`, returning `0` when unavailable. |
 | `SkillGem.SkillExperience` / `ExperienceMax` | `ExperienceMaxLevel`, `ExperiencePrevLevel`, `ExperienceToNextLevel` | renamed | `Core/PoEMemory/Components/SkillGem.cs:31‑34`. Names/semantics differ; map carefully. |
@@ -244,6 +256,10 @@ site; the *This fork* column names the in‑repo equivalent (file cited where no
 | `Element.PositionNum` : Numerics `Vector2` | `Element.PositionNum()` extension | compat‑helper | `Core/Shared/Compat/NumericsCompat.cs`, converting `Element.Position` (`Core/PoEMemory/Element.cs:61`). |
 | `Element.TextColour` / `HighlightBackgroundColor` | — | missing | Base `Element` exposes no colour members in either tree; read `Text`, supply your own colour. |
 | `Map.LargeMap.AsObject<SubMap>().MapCenter` / `.MapScale` / `.Zoom` | `Map.LargeMapShiftX/Y`, `LargeMapZoom` (floats) | missing | `Radar/Radar.cs:238‑242` casts to `SubMap`. Fork's `Map.LargeMap` is a plain `Element` and there is **no `SubMap` type**; `Core/PoEMemory/Elements/Map.cs`. (`SubMap` *is* in the reconstruction.) |
+| `Element.TryGetChildFromIndices(out Element, params int[])` | `Element.TryGetChildFromIndices` | present | `Core/PoEMemory/Element.cs`. Quiet counterpart to `GetChildFromIndices`, which `DebugWindow.LogMsg`s on every miss — plugins probe UI paths speculatively (`arturino009/ExpeditionIcons:918` sweeps 20 candidate paths in a loop), so the probing form must not spam the log. Also differs on the zero-address case: `GetChildFromIndices` returns a wrapper around address 0, this reports failure and yields `null`. |
+| `IngameUi.FullscreenPanels` / `LargePanels` : `IList<Element>` | — | missing | **11 / 10 repos** — the most-used absent `IngameUi` members, and the idiomatic "is a blocking panel open?" check (Radar, ReAgent, PickItV2, Beasts, WAYG, Blight, Character-Data, AreaStatVisual, WTW, WhereTheCirclesAt). Absent from the reconstruction too, so closing this needs a dumped child-index/offset path. Until then, callers must hand-roll a list of individual panels. |
+| `IngameUi.ItemsOnGroundLabelsVisible` | `IngameUi.ItemsOnGroundLabels` (unfiltered) | missing | 7 repos (GCV ×3, PickItV2, AltarHelper, BlightHelper, EssenceCorruptionHelper). The fork exposes the full label list only; filter on the label's own visibility yourself. |
+| `IngameUi.ChatTitlePanel` / `SellWindowHideout` / `PurchaseWindowHideout` / `QuestRewardWindow` | — | missing | 7 / 6 / 5 / 2 repos. General-purpose (non-league) panels with no offset in this fork's `IngameUElementsOffsets`. |
 
 ### Inventories & stash
 

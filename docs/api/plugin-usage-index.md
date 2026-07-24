@@ -14,6 +14,11 @@ Scope and method:
   API usage (component access, `GameController.*`, `IngameState`/`IngameUi`, `Graphics.*`,
   `Input.*`, `GameController.Files.*`, settings `*Node` types, enums, `PluginBridge`,
   `DebugWindow`, coordinate helpers, etc.). See [Source](#source) for the exact commits.
+- **Re-verified 2026-07-24**: all 45 repos re-cloned and re-swept from scratch. This pass
+  enumerated *every* `GetComponent<T>` and `IngameUi.*` member in the corpus instead of checking
+  a hand-picked symbol list, so the gap inventory below is broader than the original. Three repos
+  had moved; the other 42 reproduced their recorded commit/date/LOC exactly. See
+  [Corrections to the previous audit](#corrections-to-the-previous-audit).
 - Every "present / absent / documented" claim below was grounded by grepping this fork's
   `Core/` and `GameOffsets/` source and the `docs/api/*.md` files on this branch's HEAD.
   Symbols that real plugins use but this fork does not expose are listed under
@@ -31,15 +36,15 @@ the original list could not be cloned at their given paths and were resolved to 
 
 | Plugin | Repo | Reachable | Commit | Date | .cs / ~LOC |
 |---|---|---|---|---|---|
-| Radar | instantsc/Radar | ✓ | c244597 | 2026-03-18 | 14 / 1717 |
-| ReAgent | exApiTools/ReAgent | ✓ | 2502d86 | 2026-05-20 | 40 / 3480 |
+| Radar | instantsc/Radar | ✓ | 621a684 | 2026-07-24 | 14 / 1886 |
+| ReAgent | exApiTools/ReAgent | ✓ | a328330 | 2026-07-21 | 42 / 5323 |
 | AltarHelper | bruno105/AltarHelper | ✓ | 8d6f324 | 2026-03-19 | 4 / 893 |
 | BlightHelper | bruno105/BlightHelper | ✓ | 9c29b39 | 2023-09-07 | 2 / 185 |
 | WhereAreYouGoing | DetectiveSquirrel/ExileAPI-WhereAreYouGoing | ✓ | e94d1b3 | 2025-06-16 | 6 / 1221 |
 | ExpeditionIcons | instantsc/ExpeditionIcons | ✓ | 9950bca | 2024-04-20 | 23 / 2801 |
 | ExpeditionIcons (alt) | myrahz/ExpeditionIcons | ✓ | 62d9fa0 | 2023-04-11 | 8 / 2474 |
 | ExpeditionIcons (alt) | arturino009/ExpeditionIcons | ✓ | aa5315e | 2022-12-12 | 4 / 1198 |
-| Get-Chaos-Value | instantsc/Get-Chaos-Value | ✓ | 8ed2cc7 | 2026-05-14 | 37 / 5601 |
+| Get-Chaos-Value | instantsc/Get-Chaos-Value | ✓ | 7f5fa8c | 2026-06-27 | 37 / 5624 |
 | Get-Chaos-Value (alt) | DetectiveSquirrel/Get-Chaos-Value | ✓ | a56db55 | 2026-04-09 | 37 / 5620 |
 | Get-Chaos-Value (alt) | TheOptimisticFactory/Get-Chaos-Value | ✓ | 7c9d8b0 | 2026-03-19 | 36 / 5195 |
 | ProximityAlert | vadash/ProximityAlert | ✓ | 4c7e6b3 | 2021-07-28 | 4 / 641 |
@@ -279,47 +284,133 @@ files-in-memory.md.
 
 Symbols that real plugins use that are **absent from this fork's `Core`/`GameOffsets`**.
 These were verified absent by grepping `Core` and `GameOffsets`. They must **not** be
-documented as part of this API; they belong in a dedicated compatibility note (suggested
-file `compatibility-exileapi-compiled.md`) that records what the upstream "compiled"
-ExileApi exposes versus this fork, alongside the closest equivalent here.
+documented as part of this API; they belong in
+[compatibility-exileapi-compiled.md](compatibility-exileapi-compiled.md), which records what the
+upstream "compiled" ExileApi exposes versus this fork, alongside the closest equivalent here.
 
-| Upstream-only symbol | Used by (file) | This fork's equivalent |
+> **Re-verified 2026-07-24 against freshly cloned sources.** All 45 repositories were
+> re-cloned and re-grepped from scratch. **45/45 still reachable**; **3 had moved** since the
+> original audit (Radar `c244597`→`621a684`, ReAgent `2502d86`→`a328330`, instantsc/Get-Chaos-Value
+> `8ed2cc7`→`7f5fa8c` — table above updated). For the other 42 the recorded commit, date, file count
+> and LOC reproduced **exactly**, which is a good check on the original method. The re-run also
+> widened the sweep from hand-picked symbols to *every* `GetComponent<T>` and `IngameUi.*` member
+> used anywhere in the corpus — which surfaced several gaps the first pass missed, and invalidated
+> two citations. Both are recorded below rather than quietly dropped.
+
+### Corrections to the previous audit
+
+| Claim | Status after re-verification |
+|---|---|
+| `Mods.EnchantedMods` used by `stashie/ItemData.cs:109` | **Stale citation.** DetectiveSquirrel/Stashie @ `bd4a111` has no `ItemData.cs` and no `Mods` usage at all; **0 of 45** repos reference `EnchantedMods`. It remains a real ExileApi-Compiled member (and is now implemented here), but no plugin in this corpus exercises it. |
+| `IMemory.ReadStdVector<T>` used by `Radar/Radar.Pathfinding.cs:202` | **Stale citation.** Radar has since moved to `621a684` and no longer references `ReadStdVector` at all. The only live user is PathfindSanctum (below). |
+| `[Submenu]` / `[ConditionalDisplay]` attributes | **Under-reported.** The first pass filed these only as "types absent from `Shared/Attributes`". They are in fact the 2nd and 3rd most-used settings attributes in the corpus (17 and 8 repos). |
+| `ContentNode` / `EmptyNode` counted jointly as 11 repos | **Split.** `ContentNode` alone: 6 repos. `EmptyNode` is present in this fork; `ContentNode` is not. |
+
+### Gap inventory (re-verified 2026-07-24)
+
+Grouped by blocker. See [compatibility-exileapi-compiled.md](compatibility-exileapi-compiled.md)
+for the per-member porting notes.
+
+#### Closed since the original audit
+
+| Symbol | Used by | Resolution |
 |---|---|---|
-| `Entity.PosNum` / `GridPosNum` / `WorldPosNum` (`System.Numerics` position accessors) | Radar (`Radar.cs`), ExpeditionIcons, HarvestPicker, PickItV2 (`PickIt.cs`), ReAgent, WhereAreYouGoing, Beasts (`Beasts.cs`), DevTree, Abyss, Blight, WhereTheCirclesAt, WhereTheWispsAt, +others (~20 repos) | `Positioned.GridPos` / `WorldPos` (`Vector2`, SharpDX-typed). **Update (PR #42, `bf1a509`):** `Entity.PosNum` / `GridPosNum` (`System.Numerics` `Vector3`/`Vector2`) now exist (`Core/PoEMemory/MemoryObjects/Entity.cs`) and are documented; only `WorldPosNum` remains unexposed by this fork. |
-| ~~`IMemory.ReadStdVector<T>` / `ReadStdVectorStride<T>` + `StdVector` type~~ **(closed)** | Radar (`Radar.Pathfinding.cs:202`), PathfindSanctum (`RewardHelper.cs:320`) | `Memory.ReadStructsArray`, `ReadDoublePtrVectorClasses`, `ReadNativeArray`, `ReadList<T>`. **Update (PR #42, `668bb93`):** `Memory.ReadStdVector<T>` (both overloads) added. **Closed since:** `ReadStdVectorStride<T>` (three overloads, `Core/Shared/Compat/MemoryCompat.cs`) and the `StdVector` header type (`GameOffsets/Native/StdVector.cs`) now exist. |
-| ~~`GetComponent<Buffs>()` (a `Buffs` *component*) and `Buffs.BuffsList`~~ **(closed)** | Beasts (`Beasts.cs:117,226`), ReAgent (`RuleState.cs`, `NearbyMonsterInfo.cs`, `FlaskInfo.cs`) | **Closed since:** `Core/PoEMemory/Components/Buffs.cs` now exists, exposing `BuffsList` / `HasBuff` / `TryGetBuff`. On this fork's build the buff vector still lives in `Life` (`LifeComponentOffsets.Buffs`), so the component delegates to the owning entity's `Life.Buffs` rather than carrying a second build-specific offset — the same list `Entity.Buffs` exposes. |
-| `InventorySlotE.ExpandedMainInventory1` (and the `Expanded*` slot family) | Stashie (`Compartments/StashieSettingsHandler.cs:31`, `Compartments/FilterManager.cs:116`) | This fork's `InventorySlotE` (`Core/Shared/Enums/InventorySlotE.cs`) has `MainInventory1` but not the expanded-backpack slot enumerators. |
-| `InventoryIndex.PlayerExpandedInventory` | Stashie (`Compartments/FilterManager.cs:114`) | This fork has no `PlayerExpandedInventory` index in `InventoryIndex`. |
+| `Entity.PosNum` / `GridPosNum` | 17 / 14 repos | Real instance properties (`Core/PoEMemory/MemoryObjects/Entity.cs`), PR #42. |
+| `GetComponent<Buffs>()` / `Buffs.BuffsList` | Beasts, ReAgent | `Core/PoEMemory/Components/Buffs.cs`. On this fork's build the buff vector still lives in `Life`, so the component delegates to the owner's `Life.Buffs` rather than carrying a second build-specific offset. |
+| `ReadStdVectorStride<T>` + `StdVector` type | PathfindSanctum (`RewardHelper.cs:320`) | `Core/Shared/Compat/MemoryCompat.cs` + `GameOffsets/Native/StdVector.cs`. The live call site is `M.ReadStdVectorStride<long>(M.Read<StdVector>(addr + 0x70), 0x10)` — an exact match for the implemented `(IMemory, StdVector, int)` overload. |
+| `CustomNode` | 10 repos | `Core/Shared/Nodes/CustomNode.cs` + `SettingsParser` wiring. |
+| `Element.TryGetChildFromIndices(out Element, params int[])` | ExpeditionIcons (arturino009) | `Core/PoEMemory/Element.cs`. Quiet counterpart to the existing `GetChildFromIndices`, which logs on every miss — the call site sweeps 20 candidate paths in a loop, so a probing API must not spam the log. |
 
-Note: many of these reflect plugins targeting the newer upstream "compiled ExileApi"
-build (expanded-backpack support, remaining `System.Numerics` position helpers, `Buffs`
-component, a strided/typed `std::vector` reader), which this fork has not fully adopted.
+#### Still open — settings attributes & nodes
 
-**Update (this branch).** Three of the five families above are now closed — the `Buffs`
-component and the `ReadStdVectorStride<T>` / `StdVector` pair, in addition to the `Entity.*Num`
-row already closed by PR #42. The two **expanded-inventory enum** rows are deliberately left
-open: `InventoryIndex` and `InventorySlotE` are byte-compatible between this fork and the
-client-328.8 reconstruction, and neither contains an `Expanded*` member, so the upstream values
-exist only in the compiled distribution. Their numeric values index live inventory memory, so
-guessing one would silently read the *wrong* inventory rather than fail — the one failure mode
-worth avoiding more than the missing feature. They stay recorded here until a value is dumped.
-PR #42 (2026-07-08) closed the `IngameState.UIHoverElement` gap entirely (`UIHoverElement`
-is now an alias for `UIHover`, `Core/PoEMemory/MemoryObjects/IngameState.cs`) and partially
-closed the `Entity.*Num` and `IMemory.ReadStdVector<T>` gaps, as reflected in the rows
-above. The remaining gaps are recorded here, not invented into the reference docs.
+The largest remaining gap, and the one most likely to block a straight port: 17 of 45 plugins
+will not compile here for want of a single attribute.
+
+| Symbol | #repos | Used by (sample) |
+|---|---:|---|
+| `[Submenu]` (`SubmenuAttribute`) | 17 | Radar, ReAgent, GCV, DevTree, PickItV2, Beasts, ExpIcons, WheresMyCraftAt, Character-Data, GIWL, AltarHelper, Blight, BlightHelper, AreaStatVisual |
+| `[ConditionalDisplay]` | 8 | Radar, ExpIcons, PickItV2, Beasts, WheresMyCraftAt, SkillGems, AreaStatVisual |
+| `ContentNode<T>` (+`ContentNodeConverter`, `IContentNodeBase`) | 6 | GCV (×3), DevTree, PickItV2, AreaStatVisual |
+| `HotkeyNodeV2` / `HotkeyNodeValue` | 5 | Radar, ReAgent, DevTree, IFLI, Preloads |
+
+Not restorable from the client-328.8 reconstruction: it decompiles the two attributes to
+non-functional bodies (`ConditionalDisplayAttribute.ConditionMethodName` becomes
+`return (string)(object)this;`, and `SubmenuAttribute`'s constructor to three discarded
+constants), and stubs 7 of `ContentNode`'s and 10 of `HotkeyNodeV2`'s method bodies. The
+attribute *shapes* are obvious enough to rewrite, but they are inert without matching
+`SettingsParser`/`MenuWindow` support, which is where the real behaviour lives — so they are
+recorded as work, not faked with a no-op attribute that would compile and then silently do
+nothing.
+
+#### Still open — components requested via `GetComponent<T>`
+
+12 of the 41 distinct components the corpus requests are absent here.
+
+| Component | #uses | Requested by |
+|---|---:|---|
+| `MapKey` | 4 | GCV (×3), EZVendor |
+| `LocalStats` | 4 | GCV (×3), ReAgent |
+| `CapturedMonster` | 4 | GCV (×3), Beasts |
+| `UltimatumTrial`, `NecropolisCorpse`, `HeistRewardDisplay`, `BrequelFruit` | 3 each | GCV (×3) |
+| `Tincture` | 2 | ReAgent |
+| `HarvestWorldObject` | 2 | HarvestPicker |
+| `Movement` | 1 | WhatAreYouDoing |
+| `AttachedAnimatedObject` | 1 | ReAgent |
+| `AnimationController` | 1 | PathfindSanctum |
+
+All are offset-bearing memory components, and the reconstruction's offsets target client 328.8
+(its `ModsComponentOffsets.implicitMods` is `0xC0` where this fork's is `0x90`), so they cannot be
+ported as literals — each needs an offset dumped against the client this fork targets.
+
+#### Still open — `IngameUi` members
+
+Beyond the league-panel families already listed in the compatibility doc (Ritual, Sanctum,
+Village, Ultimatum, Expedition, Heist, Ancestor, Necropolis…), these **general-purpose** members
+are used broadly and have no league-specific excuse:
+
+| Member | #repos | Used by (sample) |
+|---|---:|---|
+| `FullscreenPanels` | 11 | Radar, ReAgent, PickItV2, Beasts, WAYG, Blight, Character-Data, AreaStatVisual, GIWL, WTW, WhereTheCirclesAt |
+| `LargePanels` | 10 | Radar, ReAgent, PickItV2, Beasts, WAYG, Blight, Character-Data, AreaStatVisual, WTW, WhereTheCirclesAt |
+| `ItemsOnGroundLabelsVisible` | 7 | GCV (×3), PickItV2, AltarHelper, BlightHelper, EssenceCorruptionHelper |
+| `ChatTitlePanel` | 7 | GCV (×3), ReAgent, PickItV2, Character-Data, SkillGems |
+| `SellWindowHideout` | 6 | GCV (×3), FRSM (×2), EZVendor |
+| `PurchaseWindowHideout` | 5 | GCV (×3), IFLI, NPCInvWithLinq |
+| `QuestRewardWindow` | 2 | IFLI, NPCInvWithLinq |
+
+`FullscreenPanels` / `LargePanels` are the idiomatic "is a blocking panel open?" check; without
+them every plugin (and this fork's own consumers) hand-rolls a list of individual panels. They are
+absent from the reconstruction too, so implementing them needs a dumped child-index/offset path
+rather than a port.
+
+Also still null-stubbed here rather than absent: `IngameUi.TradeWindow` (3 repos),
+`NpcDialog`, `MapStashTab`, `WorldMap` — the members exist so call sites compile, but return
+`null` pending a verified offset (see `Core/PoEMemory/MemoryObjects/IngameUIElements.cs`).
+
+#### Still open — miscellaneous
+
+| Symbol | Used by | Note |
+|---|---|---|
+| `InventorySlotE.Expanded*` family | Stashie (`Compartments/StashieSettingsHandler.cs:31`, `FilterManager.cs:116`) | Citation re-confirmed. Absent from the reconstruction too; the values index live inventory memory, so a guess would silently read the **wrong** inventory rather than fail. |
+| `InventoryIndex.PlayerExpandedInventory` | Stashie (`FilterManager.cs:114`) | Same; citation re-confirmed. |
+| `Positioned.WorldPosNum` as a **property** | ExpeditionIcons (instantsc, myrahz) | This fork ships it as an extension *method* (`Core/Shared/Compat/NumericsCompat.cs`), so `?.WorldPosNum` call sites need `.WorldPosNum()`. Friction, not absence. |
+| `FontAlign.VerticalCenter` | DevTree, ProximityAlert | Absent from the reconstruction too. Adding it as a flag would mean renumbering an enum that is persisted in settings files and read by existing call sites. |
 
 ---
 
 ## Verdict
 
-**The existing `docs/api/*.md` cover everything the real plugins use that this fork
-actually exposes.** Across 45 analyzed plugin repositories and roughly 120 distinct
-ExileCore API symbols observed, there are **0 doc gaps** (every used-and-present symbol is
-documented) and **5 upstream-only symbol families** that this fork does not expose and so
-must live in a compatibility note rather than the reference (down from 6 after PR #42
-closed the `IngameState.UIHoverElement` gap and partially closed the `Entity.*Num` /
-`IMemory.ReadStdVector<T>` gaps — see [Upstream-only symbols](#upstream-only-symbols)).
-The docs are accurate and complete for this fork's API surface.
+**The reference docs remain accurate for what this fork exposes**, but the original "0 doc gaps /
+5 upstream-only families" verdict was too narrow: it was drawn from a hand-picked symbol list. The
+2026-07-24 re-run swept every `GetComponent<T>` and `IngameUi.*` in the corpus and found the gap
+set is **larger and differently shaped** than recorded — the dominant blocker is not memory
+offsets but the **settings-attribute surface** (`[Submenu]` alone would stop 17 of 45 plugins from
+compiling), followed by 12 absent components and ~7 general-purpose `IngameUi` members.
+
+Five gaps have been closed since (`Entity.PosNum`/`GridPosNum`, the `Buffs` component,
+`ReadStdVectorStride`/`StdVector`, `CustomNode`, `TryGetChildFromIndices`). Two previously cited
+call sites turned out to be stale and are corrected above. Everything still open is recorded here
+with its blocker, and is *not* invented into the reference docs.
 
 ---
 
@@ -328,15 +419,15 @@ The docs are accurate and complete for this fork's API surface.
 All repositories were shallow-cloned and analyzed at the following commits (date = last
 commit date of the cloned HEAD):
 
-- instantsc/Radar @ c244597 (2026-03-18)
-- exApiTools/ReAgent @ 2502d86 (2026-05-20)
+- instantsc/Radar @ 621a684 (2026-07-24)
+- exApiTools/ReAgent @ a328330 (2026-07-21)
 - bruno105/AltarHelper @ 8d6f324 (2026-03-19)
 - bruno105/BlightHelper @ 9c29b39 (2023-09-07)
 - DetectiveSquirrel/ExileAPI-WhereAreYouGoing @ e94d1b3 (2025-06-16)
 - instantsc/ExpeditionIcons @ 9950bca (2024-04-20)
 - myrahz/ExpeditionIcons @ 62d9fa0 (2023-04-11) *(alt)*
 - arturino009/ExpeditionIcons @ aa5315e (2022-12-12) *(alt)*
-- instantsc/Get-Chaos-Value @ 8ed2cc7 (2026-05-14)
+- instantsc/Get-Chaos-Value @ 7f5fa8c (2026-06-27)
 - DetectiveSquirrel/Get-Chaos-Value @ a56db55 (2026-04-09) *(alt)*
 - TheOptimisticFactory/Get-Chaos-Value @ 7c9d8b0 (2026-03-19) *(alt)*
 - vadash/ProximityAlert @ 4c7e6b3 (2021-07-28)

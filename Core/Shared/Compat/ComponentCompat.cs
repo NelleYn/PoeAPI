@@ -114,14 +114,21 @@ public static class ComponentCompat
     /// address, the item carries no enchants, or the range looks corrupt. Walked exactly like
     /// <see cref="ImplicitMods"/>/<see cref="ExplicitMods"/>, over
     /// <c>Mods.ModsStruct.enchantedMods</c> (<c>GameOffsets/ModsComponentOffsets.cs</c>).
-    /// Used upstream by e.g. <c>stashie/ItemData.cs:109</c> (<c>modsComp?.EnchantedMods?.Count</c>).
     /// </returns>
     /// <remarks>
+    /// Provided for source compatibility with ExileApi-Compiled, where <c>Mods.EnchantedMods</c> is a
+    /// real member. Note that no plugin in the audited 45-repo corpus currently calls it: the
+    /// compatibility doc's original citation (<c>stashie/ItemData.cs:109</c>) did not survive
+    /// re-verification on 2026-07-24 — that file no longer exists in Stashie. Kept because the
+    /// upstream member is real and the enchant range is otherwise unreachable here (the fork's
+    /// combined <c>Mods.ItemMods</c> covers implicit + explicit only).
+    /// <para>
     /// The <c>enchantedMods</c> offset is <b>derived</b> rather than dumped — see the comment on that
     /// field for the derivation and its cross-checks. Because <see cref="ParseModRange"/> rejects an
     /// implausible range, a bad offset degrades to an empty list (feature silently unavailable) instead
     /// of surfacing fabricated mods; treat a persistently empty result on a known-enchanted item as the
     /// signal to re-dump the offset.
+    /// </para>
     /// </remarks>
     public static List<ItemMod> EnchantedMods(this Mods mods)
     {
