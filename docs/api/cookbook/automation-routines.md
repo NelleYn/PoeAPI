@@ -336,7 +336,8 @@ rules can't fight over the keyboard.
 > `IsKeyPressed`, `SinceLastActivation`, timers/flags, etc. It depends on upstream-only
 > symbols: `player.TryGetComponent<Buffs>(out ...)`, `Life.Health/.Mana/.EnergyShield`,
 > `Buff.DisplayName/.FlaskSlot`, `Actor.AnimationController`, `Base.Info.BaseItemTypeDat`,
-> `HotkeyNodeV2`/`HotkeyNodeValue`, and `ServerData.PartyMembers`/`WorldMousePositionNum`.
+> and `ServerData.PartyMembers`/`WorldMousePositionNum`. (`HotkeyNodeV2`/`HotkeyNodeValue` and
+> `InputHelper` are no longer among them — they ship here now, see [settings.md](../settings.md).)
 > Re-point each to the fork member named above, or to the gap row in
 > [compatibility-exileapi-compiled.md](../compatibility-exileapi-compiled.md). The compiled-
 > expression machinery (Dynamic LINQ / Roslyn) is third-party, not engine API.
@@ -402,7 +403,9 @@ See [compatibility-exileapi-compiled.md](../compatibility-exileapi-compiled.md) 
   *is* present — use `GameController.Game.IsEscapeState`.)
 - `Base.Info.BaseItemTypeDat.ClassName`, `Tincture` component, `LocalStats` (`ReAgent.FlaskInfo`)
   → not present on this fork.
-- `HotkeyNodeV2` / `HotkeyNodeValue` (`ReAgent`) → this fork has `HotkeyNode` only ([settings.md](../settings.md)).
+- `HotkeyNodeV2` / `HotkeyNodeValue` (`ReAgent`) → **now present** ([settings.md](../settings.md)),
+  together with `InputHelper.SendInputPress/Down/Up`. `AllowControllerKeys` is accepted but inert:
+  no controller input backend here.
 - `WindowsInput.InputSimulator` (`BuffUtil`) and `SendMessage` P/Invoke (`BasicFlaskRoutine`)
   → use the engine's `Input` API instead ([input.md](../input.md), [input-automation.md](input-automation.md)).
 

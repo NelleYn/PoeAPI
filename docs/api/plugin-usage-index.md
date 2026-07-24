@@ -321,26 +321,33 @@ for the per-member porting notes.
 | `CustomNode` | 10 repos | `Core/Shared/Nodes/CustomNode.cs` + `SettingsParser` wiring. |
 | `Element.TryGetChildFromIndices(out Element, params int[])` | ExpeditionIcons (arturino009) | `Core/PoEMemory/Element.cs`. Quiet counterpart to the existing `GetChildFromIndices`, which logs on every miss — the call site sweeps 20 candidate paths in a loop, so a probing API must not spam the log. |
 
-#### Still open — settings attributes & nodes
+#### Closed 2026-07-24 — settings attributes & nodes
 
-The largest remaining gap, and the one most likely to block a straight port: 17 of 45 plugins
-will not compile here for want of a single attribute.
+This was the largest remaining gap, and the one most likely to block a straight port: 17 of 45
+plugins would not compile here for want of a single attribute. All four now ship, with the menu
+behaviour behind them, not just the type declarations.
 
-| Symbol | #repos | Used by (sample) |
-|---|---:|---|
-| `[Submenu]` (`SubmenuAttribute`) | 17 | Radar, ReAgent, GCV, DevTree, PickItV2, Beasts, ExpIcons, WheresMyCraftAt, Character-Data, GIWL, AltarHelper, Blight, BlightHelper, AreaStatVisual |
-| `[ConditionalDisplay]` | 8 | Radar, ExpIcons, PickItV2, Beasts, WheresMyCraftAt, SkillGems, AreaStatVisual |
-| `ContentNode<T>` (+`ContentNodeConverter`, `IContentNodeBase`) | 6 | GCV (×3), DevTree, PickItV2, AreaStatVisual |
-| `HotkeyNodeV2` / `HotkeyNodeValue` | 5 | Radar, ReAgent, DevTree, IFLI, Preloads |
+| Symbol | #repos | Used by (sample) | Resolution |
+|---|---:|---|---|
+| `[Submenu]` (`SubmenuAttribute`) | 17 | Radar, ReAgent, GCV, DevTree, PickItV2, Beasts, ExpIcons, WheresMyCraftAt, Character-Data, GIWL, AltarHelper, Blight, BlightHelper, AreaStatVisual | `Core/Shared/Attributes/SubmenuAttribute.cs` + nested collapsible groups, `RenderMethod` self-drawing submenus (parameterless *or* taking the plugin, as DevTree's `Render(DevPlugin)` does) in `Core/SettingsParser.Reflection.cs`. |
+| `[ConditionalDisplay]` | 8 | Radar, ExpIcons, PickItV2, Beasts, WheresMyCraftAt, SkillGems, AreaStatVisual | `Core/Shared/Attributes/ConditionalDisplayAttribute.cs` + `ConditionalSettingsHolder`. Conditions resolve to a parameterless `bool` method, or a `bool`/`ToggleNode` property or field, public or not — ExpeditionIcons's are `internal bool` properties, Radar's and PickIt's are `ToggleNode`s. |
+| `ContentNode<T>` (+`ContentNodeConverter`, `IContentNodeBase`) | 6 | GCV (×3), DevTree, PickItV2, AreaStatVisual | `Core/Shared/Nodes/ContentNode.cs`, `ContentNodeConverter.cs`, `IContentNodeBase.cs`. Item headers come from `ToString()` (PickIt's `"…###{base.ToString()}"` idiom works), and `UseFlatItems` covers GCV's `ContentNode<TextNode>`. |
+| `HotkeyNodeV2` / `HotkeyNodeValue` | 5 | Radar, ReAgent, DevTree, IFLI, Preloads | `Core/Shared/Nodes/HotkeyNodeV2.cs` (+ `Core/Shared/Helpers/InputHelper.cs`, ReAgent's consumer). `HotkeyNodeValue` is nested, as ReAgent's `using static …HotkeyNodeV2;` requires, and converts implicitly to `Keys` for `Input.RegisterKey(node.Value)` (DevTree, IFLI, Radar). |
 
-Not restorable from the client-328.8 reconstruction: it decompiles the two attributes to
+None of this was portable from the client-328.8 reconstruction: it decompiles the two attributes to
 non-functional bodies (`ConditionalDisplayAttribute.ConditionMethodName` becomes
 `return (string)(object)this;`, and `SubmenuAttribute`'s constructor to three discarded
-constants), and stubs 7 of `ContentNode`'s and 10 of `HotkeyNodeV2`'s method bodies. The
-attribute *shapes* are obvious enough to rewrite, but they are inert without matching
-`SettingsParser`/`MenuWindow` support, which is where the real behaviour lives — so they are
-recorded as work, not faked with a no-op attribute that would compile and then silently do
-nothing.
+constants), and stubs 7 of `ContentNode`'s and 10 of `HotkeyNodeV2`'s method bodies. Only the
+member *shapes* were taken from it; the behaviour was written against the usage in this corpus.
+Two details could not be recovered and are recorded as fork-local choices in
+[compatibility-exileapi-compiled.md](compatibility-exileapi-compiled.md): `ContentNode<T>`'s
+display defaults, and `HotkeyNodeV2.AllowControllerKeys`, which is accepted but inert because this
+fork has no controller input backend. One default *is* evidence-backed — the reconstruction's
+discarded constants `0, 0, 1` give `SubmenuAttribute`'s three bool defaults in declaration order.
+
+Closing this also closed a related hole the audit had not filed: `TextNode` (16 repos) had no
+drawer in `SettingsParser` at all, so it silently logged "not supported" in the menu. It now
+renders as an `InputText`, which `ContentNode<TextNode>` needs anyway.
 
 #### Still open — components requested via `GetComponent<T>`
 
@@ -403,14 +410,25 @@ Also still null-stubbed here rather than absent: `IngameUi.TradeWindow` (3 repos
 **The reference docs remain accurate for what this fork exposes**, but the original "0 doc gaps /
 5 upstream-only families" verdict was too narrow: it was drawn from a hand-picked symbol list. The
 2026-07-24 re-run swept every `GetComponent<T>` and `IngameUi.*` in the corpus and found the gap
-set is **larger and differently shaped** than recorded — the dominant blocker is not memory
+set is **larger and differently shaped** than recorded — the dominant blocker was not memory
 offsets but the **settings-attribute surface** (`[Submenu]` alone would stop 17 of 45 plugins from
 compiling), followed by 12 absent components and ~7 general-purpose `IngameUi` members.
 
-Five gaps have been closed since (`Entity.PosNum`/`GridPosNum`, the `Buffs` component,
-`ReadStdVectorStride`/`StdVector`, `CustomNode`, `TryGetChildFromIndices`). Two previously cited
-call sites turned out to be stale and are corrected above. Everything still open is recorded here
-with its blocker, and is *not* invented into the reference docs.
+That dominant blocker is now closed: `[Submenu]`, `[ConditionalDisplay]`, `ContentNode<T>` and
+`HotkeyNodeV2`/`InputHelper` all ship, with menu behaviour rather than inert declarations. Nine
+gaps have been closed in total (`Entity.PosNum`/`GridPosNum`, the `Buffs` component,
+`ReadStdVectorStride`/`StdVector`, `CustomNode`, `TryGetChildFromIndices`, and those four), plus
+the `TextNode` drawer.
+
+**What remains is offset work, and it cannot be done from source alone.** The 12 absent
+components, `IngameUi.FullscreenPanels`/`LargePanels` and friends, and the
+`InventoryIndex`/`InventorySlotE` expanded-inventory members all need a memory dump taken against
+the client this fork targets: the reconstruction's numbers are client 328.8 (its
+`ModsComponentOffsets.implicitMods` is `0xC0` where this fork's is `0x90`) and a wrong offset reads
+someone else's memory **silently**, which is worse than the member being absent. That dump needs a
+Windows machine with the game running, so it stays open here rather than being guessed at. Two
+previously cited call sites turned out to be stale and are corrected above. Everything still open
+is recorded here with its blocker, and is *not* invented into the reference docs.
 
 ---
 

@@ -105,6 +105,14 @@ git grep -ln "signature-only stub"          origin/claude/ecstatic-ritchie-cje3s
 `Shared.SyncTaskMethodBuilder`, `Shared.TaskUtils`, `Shared.WaitFunctionTimed`,
 `SnapshotBuilder`, `StatCollector`.
 
+> Four of those signature-only types have since been **re-implemented from scratch** in this
+> fork rather than ported — `Shared.Nodes.ContentNode`(+ `ContentNodeConverter`,
+> `IContentNodeBase`) and `Shared.Nodes.HotkeyNodeV2`(+ `Shared.Helpers.InputHelper`), along
+> with the two settings attributes below. The member shapes below are still the DLL's; the
+> behaviour behind them is this fork's. See
+> [compatibility-exileapi-compiled.md](compatibility-exileapi-compiled.md) for what could not
+> be recovered and what was chosen instead.
+
 > External-reference gaps in the reconstruction: `Shared/PluginCompiler.cs` +
 > `Shared/MsBuildLogger.cs` reference `Microsoft.Build.*` (upstream compiled plugins via
 > MSBuild — superseded in this fork by `RoslynCompiler`); `ImguiVariadic.cs` references

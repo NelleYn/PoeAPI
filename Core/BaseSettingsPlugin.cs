@@ -57,7 +57,9 @@ public abstract class BaseSettingsPlugin<TSettings> : IPlugin where TSettings : 
         else
             _Settings = JsonConvert.DeserializeObject<TSettings>(loadedFile, SettingsContainer.jsonSettings);
 
-        SettingsParser.Parse(_Settings, Drawers);
+        // The plugin instance is passed as the menu's owner so that a [Submenu(RenderMethod = ...)]
+        // whose render method takes the plugin can be called.
+        SettingsParser.Parse(_Settings, Drawers, -1, this);
     }
 
     /// <summary>Persists the plugin settings to disk.</summary>

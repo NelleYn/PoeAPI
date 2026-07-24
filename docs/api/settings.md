@@ -73,12 +73,14 @@ Each node is a thin wrapper around a value. Most expose implicit conversions to/
 | `ToggleNode` | `bool` | Checkbox | implicit → `bool`; `OnValueChanged` event; `SetValueNoEvent` |
 | `RangeNode<T>` | `T : struct` | Slider | `int`/`float`/`long`/`Vector2` supported; implicit → `T` |
 | `HotkeyNode` | `System.Windows.Forms.Keys` | Key-capture button | implicit ↔ `Keys`; `PressedOnce()`, `UnpressedOnce()` |
+| `HotkeyNodeV2` | `HotkeyNodeValue` (key + modifiers) | Key-capture button | `Ctrl`/`Shift`/`Alt`/`Win` aware; `PressedOnce()`, `IsPressed()`, `UnpressedOnce()` |
 | `ColorNode` | `SharpDX.Color` | Color picker (`ColorEdit4`) | implicit ↔ `Color`/`uint`/`ColorBGRA` |
 | `ButtonNode` | — | Button | runs `OnPressed` action when clicked |
 | `ListNode` | `string` | Combo box | choose from `Values`; `OnValueSelected` callbacks |
-| `TextNode` | `string` | (text value) | implicit ↔ `string`; `OnValueChanged`; `SetValueNoEvent` |
+| `TextNode` | `string` | Input text | implicit ↔ `string`; `OnValueChanged`; `SetValueNoEvent` |
 | `FileNode` | `string` | File tree (`config/`) | implicit ↔ `string`; `OnFileChanged` event |
 | `StashTabNode` | (stash tab ref) | (custom) | holds `Name`/`VisibleIndex`; not auto-drawn |
+| `ContentNode<T>` | `List<T>` | Collapsible list + add/remove | user-editable list of sub-settings; persisted as a plain array |
 | `EmptyNode` | — | nothing | placeholder used as a `[Menu]` group root |
 | `CustomNode` | — | whatever `DrawDelegate` draws | plugin-supplied ImGui; holds no value, not persisted |
 
@@ -136,6 +138,96 @@ In the menu it renders as a button that opens a modal popup; pressing any key (o
 
 (See [input.md](input.md); these are backed by `Input.IsKeyDown` / `Input.GetKeyState`.)
 
+### HotkeyNodeV2
+
+`HotkeyNode` with modifiers. Its value is a `HotkeyNodeV2.HotkeyNodeValue` — a key plus the
+`Shift`/`Ctrl`/`Alt`/`Win` flags that must be held with it — so `Ctrl+F` and `F` are different
+hotkeys and two plugins can share a key under different modifiers.
+
+```csharp
+public HotkeyNodeV2 ToggleWindowKey { get; set; } = Keys.NumPad9;          // implicit Keys -> node
+public HotkeyNodeV2 ManualDumpHotkey { get; set; } = new HotkeyNodeV2(Keys.None);
+```
+
+- `Value` — the `HotkeyNodeValue` (never `null`); assigning raises `OnValueChanged` (an `Action`)
+  and registers the key with `Input`, so calling `Input.RegisterKey` yourself is optional.
+- `LegacyValue` — the key alone, as plain `Keys`, for call sites that predate modifiers. Never
+  written to the settings file.
+- `PressedOnce()` / `UnpressedOnce()` / `IsPressed()` — as on `HotkeyNode`, but the modifier state
+  has to match exactly.
+- `DrawPickerButton(string label)` — draws the picker button outside the generated menu (e.g. in a
+  per-rule editor) and returns whether a new hotkey was assigned. The picker's open state lives in
+  ImGui, so a caller may build a throw-away node per frame.
+- `IgnoreFocusedInput` — when `false` (the default) the hotkey does not fire while a text field in
+  the overlay has focus. This covers the overlay's own ImGui input only; to also suppress hotkeys
+  while the player types in the game's chat, check `IngameState.IngameUi.ChatTitlePanel` (or
+  `FocusedInputElement`) yourself.
+- `AllowControllerKeys` — accepted for source compatibility with ExileApi-Compiled, but inert on
+  this fork: there is no controller input backend, so the picker offers keyboard and mouse keys
+  only. It is not serialized.
+
+`HotkeyNodeValue` is a record (value equality, usable as a dictionary key), implicitly converts to
+`Keys`, and `ToString()`s as `Ctrl+Shift+F`. It is persisted as
+`{"Key": "NumPad9", "Shift": false, ...}`, and its converter also accepts the bare key that
+`HotkeyNode` used to write — so a plugin can migrate a property from `HotkeyNode` to
+`HotkeyNodeV2` without breaking existing settings files.
+
+To send a hotkey (with its modifiers held around the key) use
+`ExileCore.Shared.Helpers.InputHelper`:
+
+```csharp
+InputHelper.SendInputPress(Settings.MyHotkey.Value);   // down + up
+InputHelper.SendInputDown(value);                      // hold
+InputHelper.SendInputUp(value);                        // release
+```
+
+Each returns whether anything was sent, so an unbound hotkey is a no-op. Mouse buttons
+(`Keys.LButton`/`RButton`/`MButton`) are routed through the mouse API rather than sent as
+keystrokes.
+
+### ContentNode&lt;T&gt;
+
+A user-editable **list** of sub-settings. The menu renders it as a collapsible group with one entry
+per item plus add/remove controls, and the list is persisted with the rest of the settings.
+
+```csharp
+[Submenu]
+public class ChestPattern
+{
+    public ToggleNode Enabled { get; set; } = new ToggleNode(true);
+    public TextNode MetadataRegex { get; set; } = new TextNode("^$");
+
+    // Item headers come from ToString(); "text###id" keeps the id stable while the text follows
+    // the value being edited.
+    public override string ToString() => $"{MetadataRegex.Value}###{base.ToString()}";
+}
+
+public ContentNode<ChestPattern> ChestList { get; set; } = new()
+{
+    ItemFactory = () => new ChestPattern(),
+};
+```
+
+| Member | Default | Meaning |
+| --- | --- | --- |
+| `Content` | empty list | the items (`List<T>`, never `null`) |
+| `ItemFactory` | `null` | creates an item for the "add" button; without it no add button is drawn |
+| `OnRemove` | `null` | called after an item is removed through the menu |
+| `EnableControls` | `true` | draw the add/remove controls at all |
+| `EnableItemCollapsing` | `true` | give each item its own collapsible header |
+| `UseFlatItems` | `false` | items are single nodes drawn as one widget per row (e.g. `ContentNode<TextNode>`) |
+
+Everything except `Content` is `[JsonIgnore]`: it is supplied in code, so a settings file cannot
+pin it to a stale value. `Content` is written as a plain JSON array by `ContentNodeConverter`,
+which deserializes **into the existing node** — that is what keeps the `ItemFactory` assigned by
+the property initializer alive across a restart.
+
+```csharp
+// flat items: one text box per row
+public ContentNode<TextNode> ExcludedUniques { get; set; } =
+    new ContentNode<TextNode> { UseFlatItems = true, ItemFactory = () => new TextNode("") };
+```
+
 ### ColorNode
 
 Wraps `SharpDX.Color`. Renders as an ImGui `ColorEdit4` (with alpha bar, no text inputs, half alpha preview). It also tracks an HTML `Hex` string. Constructors accept a `SharpDX.Color` or a packed `uint` (interpreted as ABGR via `Color.FromAbgr`); implicit conversions exist from `Color`, `uint` and `ColorBGRA`:
@@ -174,7 +266,7 @@ Settings.Profile.SetListValues(LoadProfileNames());
 
 ### TextNode
 
-An editable string. Implicitly converts to/from `string`, fires `OnValueChanged` on change, and offers `SetValueNoEvent(string)`. (TextNode itself has no built-in drawer in `SettingsParser`; plugins typically render it in their own `DrawSettings` or use it as a plain persisted string.)
+An editable string, rendered as an ImGui `InputText` (up to 1024 characters). Implicitly converts to/from `string`, fires `OnValueChanged` on change, and offers `SetValueNoEvent(string)`.
 
 ```csharp
 public TextNode CustomConfigDir { get; set; } = new TextNode();
@@ -274,6 +366,83 @@ public ToggleNode DynamicFps { get; set; } = new ToggleNode(false);
 
 A property whose type itself implements `ISettings` and that carries a `[Menu]` with an explicit `index` becomes a **tab** (`HolderChildType.Tab`), and its inner properties are parsed under it.
 
+### SubmenuAttribute
+
+`[Submenu]` (`AttributeUsage = Class | Property`) marks a settings property — or the class used as
+one — as a **nested submenu**: instead of being flattened into the parent menu, its properties are
+rendered inside a collapsible group. The submenu class does *not* have to implement `ISettings`;
+that interface stays reserved for a plugin's root settings object.
+
+```csharp
+[Submenu(CollapsedByDefault = true)]
+public class ChestSettings
+{
+    public ToggleNode ClickChests { get; set; } = new ToggleNode(true);
+}
+
+public class MySettings : ISettings
+{
+    public ChestSettings ChestSettings { get; set; } = new ChestSettings();   // one collapsible group
+    public ToggleNode Enable { get; set; } = new ToggleNode(false);
+}
+```
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `CollapsedByDefault` | `false` | the group starts folded |
+| `EnableCollapsing` | `true` | the group is collapsible at all; when `false` it is a plain indented block |
+| `RenderMethod` | `null` | name of a method on the submenu type that draws the whole submenu itself |
+| `EnableSelfDrawCollapsing` | `false` | wrap a `RenderMethod` submenu in a collapsible header too |
+
+The attribute may sit on the property or on the property's type; the property wins if both carry
+one, so one settings class can be reused with different collapsing defaults. Submenus nest, and
+`[Menu]` names/tooltips, `[ConditionalDisplay]`, `[IgnoreMenu]` and `ContentNode<T>` all work
+inside one exactly as they do at the top level. Properties whose type is not a settings node
+(plain `int`, arrays, collections…) are skipped silently, so a submenu class may carry bookkeeping
+state of its own.
+
+`RenderMethod` names an instance method that takes **no parameters, or the plugin instance**:
+
+```csharp
+[Submenu(RenderMethod = nameof(Render))]
+public class FilterNode
+{
+    public void Render() => RulesDisplay.DrawSettings();
+}
+
+[Submenu(CollapsedByDefault = true, EnableSelfDrawCollapsing = true, RenderMethod = nameof(Render))]
+public class ExclusionSettings
+{
+    public void Render(MyPlugin plugin) { /* draws its own ImGui */ }
+}
+```
+
+Use `nameof(...)`: a name that cannot be resolved is reported once and the group is replaced by a
+disabled-text error in the menu rather than silently drawing nothing.
+
+### ConditionalDisplayAttribute
+
+`[ConditionalDisplay(string conditionMethodName, bool comparisonValue = true)]`
+(`AttributeUsage = Class | Property`) hides a property unless a condition on the declaring settings
+object matches. It is re-evaluated every frame, so a setting appears and disappears as the setting
+it depends on is toggled.
+
+```csharp
+public ToggleNode ClickChests { get; set; } = new ToggleNode(true);
+
+[ConditionalDisplay(nameof(ClickChests))]
+public RangeNode<int> ChestRadius { get; set; } = new RangeNode<int>(12, 1, 200);
+
+[ConditionalDisplay(nameof(ClickChests), false)]         // shown only while ClickChests is off
+public TextNode Explanation { get; set; } = new TextNode("");
+```
+
+The named member is resolved on the type declaring the property and may be public or not: a
+parameterless `bool` method, a `bool` property/field, or a `ToggleNode` property/field. Hiding is
+cosmetic — the value is still persisted and still readable by the plugin. A name that cannot be
+resolved is reported once at menu-build time and the property is then shown unconditionally, since
+a visible setting is a far smaller problem than one that silently vanishes.
+
 ### IgnoreMenuAttribute
 
 `[IgnoreMenu]` (declared alongside `MenuAttribute`, `AttributeUsage = Property`) excludes a property from the generated menu while still persisting it. `SettingsParser` skips any property carrying it:
@@ -297,23 +466,31 @@ To exclude a property from *saving* as well, add Newtonsoft's `[JsonIgnore]`.
 `ExileCore.SettingsParser` (static) reflects over an `ISettings` object and fills a `List<ISettingsHolder>` of drawers.
 
 ```csharp
-public static void Parse(ISettings settings, List<ISettingsHolder> draws, int id = -1);
+public static void Parse(ISettings settings, List<ISettingsHolder> draws, int id = -1, object owner = null);
 ```
+
+`owner` is the plugin instance; `BaseSettingsPlugin` passes `this`, and it is only used to call a
+`[Submenu(RenderMethod = ...)]` method that takes the plugin as its parameter.
 
 For each public property (in declaration order):
 
 1. Skip it if it has `[IgnoreMenu]`.
-2. Read its `[Menu]` (or synthesize one from the property name).
+2. Read its `[Menu]` (or synthesize one from the property name; `[Menu(null, "tooltip")]` keeps the derived label).
 3. <a id="enable-handling"></a>If the property is named `Enable` and has no `[Menu]`, skip it (the core renders the enable toggle separately).
-4. If the property type implements `ISettings`, recurse into it — creating a **tab** holder when its `[Menu]` has an explicit `index`, otherwise inlining its members.
-5. Otherwise create a `SettingsHolder`, attach it to its parent (by `parentIndex`, then by the recursion `id`, else at top level), and assign a `DrawDelegate` based on the node's runtime type via a `switch`:
+4. If the property type implements `ISettings` **and carries no `[Submenu]`**, recurse into it — creating a **tab** holder when its `[Menu]` has an explicit `index`, otherwise inlining its members.
+5. Otherwise create a holder (a `ConditionalSettingsHolder` when the property has `[ConditionalDisplay]`), attach it to its parent (by `parentIndex`, then by the recursion `id`, else at top level), and assign a `DrawDelegate`:
+   - `[Submenu]` → a collapsible group that reflects over the submenu object at draw time, or its `RenderMethod`;
+   - `ContentNode<T>` → a collapsible list of its items with add/remove controls;
+   - otherwise, a widget picked from the node's runtime type via a `switch`:
 
 | Runtime type | ImGui call |
 | --- | --- |
 | `ButtonNode` | `Button` → `OnPressed()` |
 | `HotkeyNode` | `Button` + key-capture `BeginPopupModal` |
+| `HotkeyNodeV2` | `Button` + modifier-aware key picker (`DrawPickerButton`) |
 | `ToggleNode` | `Checkbox` |
 | `ColorNode` | `ColorEdit4` |
+| `TextNode` | `InputText` |
 | `ListNode` | `BeginCombo` / `Selectable` over `Values` |
 | `FileNode` | `TreeNode` listing files in `config/` |
 | `RangeNode<int>` | `SliderInt` |
@@ -324,7 +501,9 @@ For each public property (in declaration order):
 | `CustomNode` | none built-in — invokes `DrawDelegate` |
 | anything else | logs a "not supported" warning |
 
-The produced `SettingsHolder.Draw()` renders the widget; holders with children render their children inside a bordered child region (or tab) labelled with `Name` and an optional `(?)` tooltip.
+The produced `SettingsHolder.Draw()` renders the widget; holders with children render their children inside a bordered child region (or tab) labelled with `Name` and an optional `(?)` tooltip. A `ConditionalSettingsHolder` skips itself entirely — widget, tooltip and children — while its condition is false.
+
+Submenus and content nodes are drawn **reflectively at draw time** (`Core/SettingsParser.Reflection.cs`) rather than baked into the holder tree: a content node's items come and go while the menu is open, and a `[ConditionalDisplay]` condition has to be re-checked every frame. Per-object drawer lists are cached in a `ConditionalWeakTable`, so an item the user removes is not kept alive by the menu. Inside those groups, a property whose type is not a settings node is skipped silently (a submenu class may hold state of its own), and a drawer that throws is reported once instead of at frame rate.
 
 ## SettingsContainer
 
@@ -362,6 +541,15 @@ These Newtonsoft `CustomCreationConverter`s flatten nodes to scalars so settings
 | `ColorNodeConverter` | hex string → `ColorNode` (parsed as ABGR hex via `Color.FromAbgr`) | `ColorNode` → 8-digit ABGR hex (e.g. `"ff00ff00"`) |
 | `ToggleNodeConverter` | `bool` → `ToggleNode` | `ToggleNode` → `bool` |
 | `FileNodeConverter` | `string` → `FileNode` | `FileNode` → its string `Value` |
+
+Two more converters are attached to their types with `[JsonConverter]` instead of being registered
+in `jsonSettings`, so they also apply to a plugin that serializes settings with a serializer of its
+own:
+
+| Converter | Reads | Writes |
+| --- | --- | --- |
+| `ContentNodeConverter` | JSON array → the **existing** `ContentNode<T>` (keeping its `ItemFactory`) | `ContentNode<T>` → array of its items |
+| `HotkeyNodeValueConverter` | `{"Key": "F5", "Ctrl": true, …}`, or a bare key (number or name) written by `HotkeyNode` | the key/modifier object |
 
 Other nodes (`RangeNode`, `ListNode`, `HotkeyNode`, `TextNode`, `StashTabNode`) serialize via their public properties, with `[JsonIgnore]` excluding runtime-only members (e.g. `RangeNode.Min`/`Max`, `ListNode.Values`).
 
@@ -435,10 +623,11 @@ Settings.ResetRendering.OnPressed += () => ResetOverlay();
 
 ## Source
 
-- `Core/Shared/Nodes/` — `ToggleNode.cs`, `RangeNode.cs`, `HotkeyNode.cs`, `ColorNode.cs`, `ButtonNode.cs`, `ListNode.cs`, `TextNode.cs`, `FileNode.cs`, `StashTabNode.cs`, `EmptyNode.cs`
-- `Core/Shared/Nodes/ColorNodeConverter.cs`, `ToggleNodeConverter.cs`, `FileNodeConverter.cs`, `SortContractResolver.cs`
-- `Core/Shared/Attributes/MenuAttribute.cs` (declares `MenuAttribute` and `IgnoreMenuAttribute`), `HideInReflectionAttribute.cs`
+- `Core/Shared/Nodes/` — `ToggleNode.cs`, `RangeNode.cs`, `HotkeyNode.cs`, `HotkeyNodeV2.cs`, `ColorNode.cs`, `ButtonNode.cs`, `ListNode.cs`, `TextNode.cs`, `FileNode.cs`, `StashTabNode.cs`, `ContentNode.cs`, `IContentNodeBase.cs`, `EmptyNode.cs`
+- `Core/Shared/Nodes/ColorNodeConverter.cs`, `ToggleNodeConverter.cs`, `FileNodeConverter.cs`, `ContentNodeConverter.cs`, `SortContractResolver.cs`
+- `Core/Shared/Attributes/MenuAttribute.cs` (declares `MenuAttribute` and `IgnoreMenuAttribute`), `SubmenuAttribute.cs`, `ConditionalDisplayAttribute.cs`, `HideInReflectionAttribute.cs`
+- `Core/Shared/Helpers/InputHelper.cs` — sends a `HotkeyNodeValue` as synthetic input
 - `Core/Shared/Interfaces/ISettings.cs`, `ISettingsHolder.cs`
-- `Core/SettingsParser.cs` (`SettingsParser`, `SettingsHolder`, `HolderChildType`), `Core/SettingsContainer.cs`
+- `Core/SettingsParser.cs` (`SettingsParser`, `SettingsHolder`, `ConditionalSettingsHolder`, `HolderChildType`), `Core/SettingsParser.Reflection.cs` (submenus, conditional display, content nodes), `Core/SettingsContainer.cs`
 - `Core/CoreSettings.cs` — the framework's own `ISettings` implementation, a worked reference
 - `Core/Shared/Enums/InventoryEnums.cs` — `InventoryTabFlags` (used by `StashTabNode`)

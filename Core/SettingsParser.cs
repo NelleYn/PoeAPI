@@ -20,13 +20,25 @@ namespace ExileCore;
 /// property, wiring up the appropriate widget (button, toggle, slider, color, list, ...) based
 /// on the property's node type and <c>[Menu]</c> attributes.
 /// </summary>
-public static class SettingsParser
+/// <remarks>
+/// <c>[Submenu]</c>, <c>[ConditionalDisplay]</c> and <see cref="ContentNode{T}"/> are handled in
+/// <c>SettingsParser.Reflection.cs</c>: unlike the widgets below, those render a tree whose shape
+/// (and, for content nodes, whose contents) is only known at draw time.
+/// </remarks>
+public static partial class SettingsParser
 {
     /// <summary>
     /// Recursively parses the settings object into the supplied drawer list, nesting child
     /// drawers under their parent tabs/borders according to the menu attributes.
     /// </summary>
-    public static void Parse(ISettings settings, List<ISettingsHolder> draws, int id = -1)
+    /// <param name="settings">The settings object to reflect over.</param>
+    /// <param name="draws">The drawer list to append to.</param>
+    /// <param name="id">The parent holder id, or -1 at the top level.</param>
+    /// <param name="owner">
+    /// The plugin instance the settings belong to, if any. Only used to call a
+    /// <see cref="SubmenuAttribute.RenderMethod"/> that takes the plugin as its parameter.
+    /// </param>
+    public static void Parse(ISettings settings, List<ISettingsHolder> draws, int id = -1, object owner = null)
     {
         if (settings == null)
         {
@@ -40,21 +52,28 @@ public static class SettingsParser
         {
             if (property.GetCustomAttribute<IgnoreMenuAttribute>() != null) continue;
             var menuAttribute = property.GetCustomAttribute<MenuAttribute>();
+            var submenuAttribute = GetSubmenuAttribute(property);
             var isSettings = property.PropertyType.GetInterfaces().ContainsF(typeof(ISettings));
 
             if (property.Name == "Enable" && menuAttribute == null) continue;
 
             if (menuAttribute == null)
-                menuAttribute = new MenuAttribute(Regex.Replace(property.Name, "(\\B[A-Z])", " $1"));
+                menuAttribute = new MenuAttribute(PrettifyName(property.Name));
 
-            var holder = new SettingsHolder
-            {
-                Name = menuAttribute.MenuName,
-                Tooltip = menuAttribute.Tooltip,
-                ID = menuAttribute.index == -1 ? MathHepler.Randomizer.Next(int.MaxValue) : menuAttribute.index
-            };
+            var condition = BuildCondition(settings, property.GetCustomAttribute<ConditionalDisplayAttribute>());
 
-            if (isSettings)
+            var holder = condition == null
+                ? new SettingsHolder()
+                : new ConditionalSettingsHolder {ShouldDraw = condition};
+
+            holder.Name = ResolveName(menuAttribute, property.Name);
+            holder.Tooltip = menuAttribute.Tooltip;
+            holder.ID = menuAttribute.index == -1 ? MathHepler.Randomizer.Next(int.MaxValue) : menuAttribute.index;
+
+            // A settings object nested via ISettings is flattened into the parent menu (or into its
+            // own tab), which is the pre-[Submenu] way of grouping. [Submenu] on the same property
+            // asks for the grouped rendering instead, so it wins.
+            if (isSettings && submenuAttribute == null)
             {
                 var innerSettings = (ISettings) property.GetValue(settings);
 
@@ -62,12 +81,12 @@ public static class SettingsParser
                 {
                     holder.Type = HolderChildType.Tab;
                     draws.Add(holder);
-                    Parse(innerSettings, draws, menuAttribute.index);
+                    Parse(innerSettings, draws, menuAttribute.index, owner);
                     var parent = GetAllDrawers(draws).Find(x => x.ID == menuAttribute.parentIndex);
                     parent?.Children.Add(holder);
                 }
                 else
-                    Parse(innerSettings, draws);
+                    Parse(innerSettings, draws, -1, owner);
 
                 continue;
             }
@@ -87,176 +106,209 @@ public static class SettingsParser
             else
                 draws.Add(holder);
 
-            switch (type)
+            if (submenuAttribute != null)
             {
-                case ButtonNode n:
-                    holder.DrawDelegate = () =>
+                holder.DrawDelegate = BuildSubmenuDrawer(type, submenuAttribute, holder.Name, holder.ID.ToString(), owner);
+                continue;
+            }
+
+            if (type is IContentNodeBase contentNode)
+            {
+                holder.DrawDelegate = BuildContentNodeDrawer(contentNode, holder.Name, holder.ID.ToString(), owner);
+                continue;
+            }
+
+            var drawDelegate = GetNodeDrawDelegate(type, holder.Name, holder.ID.ToString());
+
+            if (drawDelegate == null)
+            {
+                Core.Logger.Warning($"{type} not supported for menu now. Ask developers to add this type.");
+                continue;
+            }
+
+            holder.DrawDelegate = drawDelegate;
+        }
+    }
+
+    /// <summary>
+    /// Builds the widget for a single settings node, or <c>null</c> when the value is not a node
+    /// type the menu knows how to draw.
+    /// </summary>
+    /// <param name="node">The node value.</param>
+    /// <param name="name">The display name.</param>
+    /// <param name="id">The ImGui id suffix, unique within the settings tree.</param>
+    internal static Action GetNodeDrawDelegate(object node, string name, string id)
+    {
+        var label = $"{name}##{id}";
+
+        switch (node)
+        {
+            case ButtonNode n:
+                return () =>
+                {
+                    if (ImGui.Button(label)) n.OnPressed();
+                };
+            case EmptyNode:
+                return () => { };
+            // The node supplies its own ImGui drawing instead of mapping to a built-in control.
+            // The field is read at draw time (not captured), so a plugin may swap the callback
+            // after the menu is built; ?.Invoke() keeps a node whose delegate is null or has been
+            // cleared a silent no-op, like EmptyNode, instead of throwing on the render thread.
+            case CustomNode n:
+                return () => n.DrawDelegate?.Invoke();
+            case HotkeyNodeV2 n:
+                return () => n.DrawPickerButton($"{name}: {n.Value}##{id}");
+            case HotkeyNode n:
+                return () =>
+                {
+                    var holderName = $"{name} {n.Value}##{n.Value}";
+                    var open = true;
+
+                    if (ImGui.Button(holderName))
                     {
-                        if (ImGui.Button(holder.Unique)) n.OnPressed();
-                    };
+                        ImGui.OpenPopup(holderName);
+                        open = true;
+                    }
 
-                    break;
-                case EmptyNode n:
-
-                    break;
-                // The node supplies its own ImGui drawing instead of mapping to a built-in control.
-                // The field is read at draw time (not captured), so a plugin may swap the callback
-                // after the menu is built; ?.Invoke() keeps a node whose delegate is null or has been
-                // cleared a silent no-op, like EmptyNode, instead of throwing on the render thread.
-                case CustomNode n:
-                    holder.DrawDelegate = () => n.DrawDelegate?.Invoke();
-
-                    break;
-                case HotkeyNode n:
-                    holder.DrawDelegate = () =>
+                    if (ImGui.BeginPopupModal(holderName, ref open, (ImGuiWindowFlags) 35))
                     {
-                        var holderName = $"{holder.Name} {n.Value}##{n.Value}";
-                        var open = true;
-
-                        if (ImGui.Button(holderName))
+                        if (Input.GetKeyState(Keys.Escape))
                         {
-                            ImGui.OpenPopup(holderName);
-                            open = true;
+                            ImGui.CloseCurrentPopup();
+                            ImGui.EndPopup();
+                            return;
                         }
 
-                        if (ImGui.BeginPopupModal(holderName, ref open, (ImGuiWindowFlags) 35))
+                        foreach (var key in Enum.GetValues(typeof(Keys)))
                         {
-                            if (Input.GetKeyState(Keys.Escape))
+                            var keyState = Input.GetKeyState((Keys) key);
+
+                            if (keyState)
                             {
+                                n.Value = (Keys) key;
                                 ImGui.CloseCurrentPopup();
-                                ImGui.EndPopup();
+                                break;
+                            }
+                        }
+
+                        ImGui.Text($" Press new key to change '{n.Value}' or Esc for exit.");
+
+                        ImGui.EndPopup();
+                    }
+                };
+            case ToggleNode n:
+                return () =>
+                {
+                    var value = n.Value;
+                    ImGui.Checkbox(label, ref value);
+                    n.Value = value;
+                };
+            case ColorNode n:
+                return () =>
+                {
+                    var vector4 = n.Value.ToVector4().ToVector4Num();
+
+                    if (ImGui.ColorEdit4(label, ref vector4,
+                        ImGuiColorEditFlags.AlphaBar | ImGuiColorEditFlags.NoInputs |
+                        ImGuiColorEditFlags.AlphaPreviewHalf)) n.Value = vector4.ToSharpColor();
+                };
+            case TextNode n:
+                return () =>
+                {
+                    var value = n.Value ?? "";
+                    if (ImGui.InputText(label, ref value, TextNodeMaxLength, ImGuiInputTextFlags.None)) n.Value = value;
+                };
+            case ListNode n:
+                return () =>
+                {
+                    if (ImGui.BeginCombo(label, n.Value))
+                    {
+                        foreach (var t in n.Values)
+                        {
+                            if (ImGui.Selectable(t))
+                            {
+                                n.Value = t;
+                                ImGui.EndCombo();
                                 return;
                             }
-
-                            foreach (var key in Enum.GetValues(typeof(Keys)))
-                            {
-                                var keyState = Input.GetKeyState((Keys) key);
-
-                                if (keyState)
-                                {
-                                    n.Value = (Keys) key;
-                                    ImGui.CloseCurrentPopup();
-                                    break;
-                                }
-                            }
-
-                            ImGui.Text($" Press new key to change '{n.Value}' or Esc for exit.");
-
-                            ImGui.EndPopup();
                         }
-                    };
 
-                    break;
-                case ToggleNode n:
-                    holder.DrawDelegate = () =>
+                        ImGui.EndCombo();
+                    }
+                };
+            case FileNode n:
+                return () =>
+                {
+                    if (ImGui.TreeNode(label))
                     {
-                        var value = n.Value;
-                        ImGui.Checkbox(holder.Unique, ref value);
-                        n.Value = value;
-                    };
+                        var selected = n.Value;
 
-                    break;
-                case ColorNode n:
-                    holder.DrawDelegate = () =>
-                    {
-                        var vector4 = n.Value.ToVector4().ToVector4Num();
-
-                        if (ImGui.ColorEdit4(holder.Unique, ref vector4,
-                            ImGuiColorEditFlags.AlphaBar | ImGuiColorEditFlags.NoInputs |
-                            ImGuiColorEditFlags.AlphaPreviewHalf)) n.Value = vector4.ToSharpColor();
-                    };
-
-                    break;
-                case ListNode n:
-                    holder.DrawDelegate = () =>
-                    {
-                        if (ImGui.BeginCombo(holder.Unique, n.Value))
+                        if (ImGui.BeginChildFrame(1, new Vector2(0, 300)))
                         {
-                            foreach (var t in n.Values)
+                            var di = new DirectoryInfo("config");
+
+                            if (di.Exists)
                             {
-                                if (ImGui.Selectable(t))
+                                foreach (var file in di.GetFiles())
                                 {
-                                    n.Value = t;
-                                    ImGui.EndCombo();
-                                    return;
+                                    if (ImGui.Selectable(file.Name, selected == file.FullName))
+                                        n.Value = file.FullName;
                                 }
                             }
 
-                            ImGui.EndCombo();
+                            ImGui.EndChildFrame();
                         }
-                    };
 
-                    break;
-                case FileNode n:
-                    holder.DrawDelegate = () =>
-                    {
-                        if (ImGui.TreeNode(holder.Unique))
-                        {
-                            var selected = n.Value;
-
-                            if (ImGui.BeginChildFrame(1, new Vector2(0, 300)))
-                            {
-                                var di = new DirectoryInfo("config");
-
-                                if (di.Exists)
-                                {
-                                    foreach (var file in di.GetFiles())
-                                    {
-                                        if (ImGui.Selectable(file.Name, selected == file.FullName))
-                                            n.Value = file.FullName;
-                                    }
-                                }
-
-                                ImGui.EndChildFrame();
-                            }
-
-                            ImGui.TreePop();
-                        }
-                    };
-
-                    break;
-                case RangeNode<int> n:
-                    holder.DrawDelegate = () =>
-                    {
-                        var r = n.Value;
-                        ImGui.SliderInt(holder.Unique, ref r, n.Min, n.Max);
-                        n.Value = r;
-                    };
-
-                    break;
-                case RangeNode<float> n:
-
-                    holder.DrawDelegate = () =>
-                    {
-                        var r = n.Value;
-                        ImGui.SliderFloat(holder.Unique, ref r, n.Min, n.Max);
-                        n.Value = r;
-                    };
-
-                    break;
-                case RangeNode<long> n:
-                    holder.DrawDelegate = () =>
-                    {
-                        var r = (int) n.Value;
-                        ImGui.SliderInt(holder.Unique, ref r, (int) n.Min, (int) n.Max);
-                        n.Value = r;
-                    };
-
-                    break;
-                case RangeNode<Vector2> n:
-                    holder.DrawDelegate = () =>
-                    {
-                        var vect = n.Value;
-                        ImGui.SliderFloat2(holder.Unique, ref vect, n.Min.X, n.Max.X);
-                        n.Value = vect;
-                    };
-
-                    break;
-                default:
-                    Core.Logger.Warning($"{type} not supported for menu now. Ask developers to add this type.");
-                    break;
-            }
+                        ImGui.TreePop();
+                    }
+                };
+            case RangeNode<int> n:
+                return () =>
+                {
+                    var r = n.Value;
+                    ImGui.SliderInt(label, ref r, n.Min, n.Max);
+                    n.Value = r;
+                };
+            case RangeNode<float> n:
+                return () =>
+                {
+                    var r = n.Value;
+                    ImGui.SliderFloat(label, ref r, n.Min, n.Max);
+                    n.Value = r;
+                };
+            case RangeNode<long> n:
+                return () =>
+                {
+                    var r = (int) n.Value;
+                    ImGui.SliderInt(label, ref r, (int) n.Min, (int) n.Max);
+                    n.Value = r;
+                };
+            case RangeNode<Vector2> n:
+                return () =>
+                {
+                    var vect = n.Value;
+                    ImGui.SliderFloat2(label, ref vect, n.Min.X, n.Max.X);
+                    n.Value = vect;
+                };
+            default:
+                return null;
         }
+    }
+
+    /// <summary>Turns <c>SomePropertyName</c> into <c>Some Property Name</c>.</summary>
+    private static string PrettifyName(string propertyName)
+    {
+        return Regex.Replace(propertyName, "(\\B[A-Z])", " $1");
+    }
+
+    /// <summary>
+    /// The display name for a property: the <c>[Menu]</c> name when it has one, otherwise the
+    /// prettified property name. <c>[Menu(null, "tooltip")]</c> is a common way to attach only a
+    /// tooltip, and must not blank out the label.
+    /// </summary>
+    private static string ResolveName(MenuAttribute menuAttribute, string propertyName)
+    {
+        return string.IsNullOrEmpty(menuAttribute?.MenuName) ? PrettifyName(propertyName) : menuAttribute.MenuName;
     }
 
     private static List<ISettingsHolder> GetAllDrawers(List<ISettingsHolder> SettingPropertyDrawers)
@@ -328,7 +380,7 @@ public class SettingsHolder : ISettingsHolder
     public IList<ISettingsHolder> Children { get; } = new List<ISettingsHolder>();
 
     /// <summary>Draws this holder and its children via ImGui.</summary>
-    public void Draw()
+    public virtual void Draw()
     {
         var size = ImGui.GetFont();
 
@@ -384,5 +436,26 @@ public class SettingsHolder : ISettingsHolder
                 if (ImGui.IsItemHovered(ImGuiHoveredFlags.None)) ImGui.SetTooltip(Tooltip);
             }
         }
+    }
+}
+
+/// <summary>
+/// A holder that is skipped entirely — widget, tooltip and children — while its condition is
+/// false. Built for properties carrying <see cref="ConditionalDisplayAttribute"/>.
+/// </summary>
+/// <remarks>
+/// The check has to sit at the holder level rather than inside the draw delegate, otherwise the
+/// tooltip marker drawn by <see cref="SettingsHolder.Draw"/> would be left behind on its own.
+/// </remarks>
+public class ConditionalSettingsHolder : SettingsHolder
+{
+    /// <summary>Evaluated every frame; the holder is drawn only when it returns <c>true</c>.</summary>
+    public Func<bool> ShouldDraw { get; set; }
+
+    /// <summary>Draws the holder unless <see cref="ShouldDraw"/> says otherwise.</summary>
+    public override void Draw()
+    {
+        if (ShouldDraw != null && !ShouldDraw()) return;
+        base.Draw();
     }
 }

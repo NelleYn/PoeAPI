@@ -136,39 +136,64 @@ Quests: `QuestFlagDat`, `QuestFlagsDat`, `QuestReward(+Offer)`. Mechanic tables:
 `VillageShippingPort`, …), `VillageUniqueDisenchantValue`, `ChestRecord`, `ClientString`,
 `WordEntry`.
 
-### Shared/Nodes (5 absent — `CustomNode` has since been added)
+### Shared/Nodes (1 absent — `CustomNode`, `ContentNode` and `HotkeyNodeV2` have since been added)
 
-`ContentNode`, `ContentNodeConverter`, `IContentNodeBase`, `HotkeyNodeV2`,
-`JsonSerializationHelper`. This fork ships `Toggle/Range/Hotkey/Color/Button/List/Text/File/
-StashTab/Empty/Custom` — see [settings.md](settings.md).
+`JsonSerializationHelper` is the only one left. This fork ships
+`Toggle/Range/Hotkey/HotkeyV2/Color/Button/List/Text/File/StashTab/Content/Empty/Custom` —
+see [settings.md](settings.md).
 
-### Shared/Attributes (2 absent) — **the highest-traffic gap in this document**
+`ContentNode<T>` (+ `ContentNodeConverter`, `IContentNodeBase`) and `HotkeyNodeV2`
+(+ its nested `HotkeyNodeValue`) were **written from scratch**, not ported: the reconstruction
+stubs 7 of `ContentNode`'s and 10 of `HotkeyNodeV2`'s bodies. Only the member *shapes* come from
+it; the behaviour is this fork's, and the two places where the original semantics were
+unrecoverable are called out in [settings.md](settings.md):
 
-`SubmenuAttribute` (`[Submenu]`), `ConditionalDisplayAttribute` (`[ConditionalDisplay]`).
-This fork has only `[Menu]` and `[HideInReflection]`.
+- `ContentNode<T>`'s display defaults (`EnableControls`/`EnableItemCollapsing` default to `true`,
+  `UseFlatItems` to `false`). They are code-set and `[JsonIgnore]`d, so a plugin that cares sets
+  them explicitly, as Get-Chaos-Value already does.
+- `HotkeyNodeV2.AllowControllerKeys` is accepted but inert — this fork has no controller input
+  backend, so the picker offers keyboard and mouse keys only. Nothing in the 45-plugin corpus
+  reads `HotkeyNodeV2.ControllerKey` or `SelectableControllerKeys`, so those are not declared
+  rather than declared and dead.
 
-The 2026-07-24 re-sweep of the 45-plugin corpus found `[Submenu]` in **17 repos** and
-`[ConditionalDisplay]` in **8** — second and third only to `[Menu]` (25). A plugin using
-`[Submenu]` does not compile here at all, so this single missing attribute blocks more straight
-ports than every offset gap in this document combined.
+`JsonSerializationHelper` remains absent: its `Unwrap` body was protected in the DLL and it exists
+to reach into Newtonsoft's internal serializer proxy, which nothing here needs —
+`ContentNodeConverter` reads into the existing node instead.
 
-Neither is restorable from the reconstruction: it decompiles them to non-functional bodies
+### Shared/Attributes (0 absent — both have since been added)
+
+`SubmenuAttribute` (`[Submenu]`) and `ConditionalDisplayAttribute` (`[ConditionalDisplay]`) now
+ship (`Core/Shared/Attributes/`), together with the menu behaviour that makes them do something:
+nested collapsible submenus, self-drawing submenus (`RenderMethod`) and per-frame conditional
+visibility, in `Core/SettingsParser.cs` + `Core/SettingsParser.Reflection.cs`.
+
+This was the highest-traffic gap in this document. The 2026-07-24 re-sweep of the 45-plugin corpus
+found `[Submenu]` in **17 repos** and `[ConditionalDisplay]` in **8** — second and third only to
+`[Menu]` (25) — and a plugin using `[Submenu]` did not compile here at all.
+
+Neither was restorable from the reconstruction: it decompiles them to non-functional bodies
 (`ConditionalDisplayAttribute.ConditionMethodName` becomes `return (string)(object)this;`,
-`SubmenuAttribute`'s constructor to three discarded constants). The attribute *shapes* are easy
-to rewrite, but an attribute with no matching `SettingsParser`/`MenuWindow` support is inert —
-it would compile and then silently do nothing, which is worse than a compile error. Closing this
-gap means implementing the menu behaviour, not just declaring the types.
+`SubmenuAttribute`'s constructor to three discarded constants). Declaring the types alone would
+have been worse than the compile error — an attribute with no `SettingsParser` support compiles
+and then silently does nothing — so the menu behaviour was implemented from the observed plugin
+usage. One detail *is* taken from the reconstruction: those three discarded constants (`0, 0, 1`,
+in declaration order) give `SubmenuAttribute`'s property defaults —
+`CollapsedByDefault = false`, `EnableSelfDrawCollapsing = false`, `EnableCollapsing = true`.
 
 ### Shared/Enums (8 absent)
 
 `HeistJobE`, `Influence`, `InfluenceTypes`, `InventoryNameE`, `InventoryTabAffinity`,
 `QuestFlag`, `SkillGemQualityTypeE`, `SocketColor`.
 
-### Shared/Helpers (2 absent — `MoreLinq/PairwiseExtension` has since been added)
+### Shared/Helpers (1 absent — `MoreLinq/PairwiseExtension` and `InputHelper` have since been added)
 
-`InputHelper`, `WindowsUtils`. Both are `NotImplementedException` stubs in the reconstruction
-(bodies were protected in the DLL), and `InputHelper` is typed in terms of the still-absent
-`HotkeyNodeV2`, so neither can be restored from it — they would have to be written from scratch.
+`WindowsUtils` is the only one left; its bodies were protected in the DLL, so it would have to be
+written from scratch, and nothing in the corpus calls it.
+
+`InputHelper` now ships (`Core/Shared/Helpers/InputHelper.cs`) with the same three signatures
+(`SendInputPress`/`SendInputDown`/`SendInputUp` over `HotkeyNodeV2.HotkeyNodeValue`) — also written
+from scratch, since the reconstruction's bodies were protected. It holds the hotkey's modifiers
+around the key and routes mouse buttons through the mouse API. ReAgent is the live caller.
 
 `ExileCore.Shared.Helpers.MoreLinq.PairwiseExtension` now ships
 (`Core/Shared/Helpers/MoreLinq/PairwiseExtension.cs`), forwarding to the `morelinq` package
@@ -296,11 +321,12 @@ site; the *This fork* column names the in‑repo equivalent (file cited where no
 
 | Upstream member | This fork | Status | Notes |
 | --- | --- | --- | --- |
-| `ContentNode<T>` / `IContentNodeBase` | — | missing | List‑of‑sub‑settings node; not in fork. (`Core/Shared/Nodes/ContentNode.cs` exists in reconstruction.) |
+| `ContentNode<T>` / `IContentNodeBase` | `ContentNode<T>` / `IContentNodeBase` | present | `Core/Shared/Nodes/ContentNode.cs` — user‑editable list of sub‑settings, drawn as a collapsible group with add/remove controls. `ContentNodeConverter` persists it as a plain array and reads back **into the existing node**, so the `ItemFactory` from the property initializer survives a restart. `IContentNodeBase` is `internal` (it exists for the menu builder), as upstream. Display defaults were unrecoverable from the reconstruction — see §2. |
 | `CustomNode` | `CustomNode` | present | `Core/Shared/Nodes/CustomNode.cs` — holds a `[JsonIgnore]` `DrawDelegate` invoked by `SettingsParser` where the node appears (same treatment as `ButtonNode.OnPressed`). Holds no value and is not persisted. |
-| `HotkeyNodeV2` / `HotkeyNodeValue` | `HotkeyNode` | missing | Fork has the v1 `HotkeyNode` only. Used by DevTree, IFLI, Preloads, ReAgent. |
-| `[Submenu]` (`SubmenuAttribute`) | — | missing | Use `[Menu]` nesting; `Core/Shared/Attributes/`. |
-| `[ConditionalDisplay]` (`ConditionalDisplayAttribute`) | — | missing | No conditional‑visibility attribute here. |
+| `HotkeyNodeV2` / `HotkeyNodeValue` | `HotkeyNodeV2` / `HotkeyNodeV2.HotkeyNodeValue` | present | `Core/Shared/Nodes/HotkeyNodeV2.cs` — key + `Shift`/`Ctrl`/`Alt`/`Win`, `PressedOnce`/`IsPressed`/`UnpressedOnce`, `DrawPickerButton`, `LegacyValue` (+ `ShouldSerializeLegacyValue`), implicit `Keys` conversions. `HotkeyNodeValue` is a nested record, matching `using static ExileCore.Shared.Nodes.HotkeyNodeV2;` in ReAgent. Its converter also reads the bare key `HotkeyNode` wrote, so migrating a property does not break existing settings files. `AllowControllerKeys` is inert here (no controller backend). |
+| `InputHelper.SendInputPress/Down/Up(HotkeyNodeValue)` | same | present | `Core/Shared/Helpers/InputHelper.cs` — holds the modifiers around the key; mouse buttons go through the mouse API. Returns `false` for an unbound hotkey instead of sending a stray keystroke. |
+| `[Submenu]` (`SubmenuAttribute`) | `[Submenu]` | present | `Core/Shared/Attributes/SubmenuAttribute.cs` + menu support in `Core/SettingsParser.Reflection.cs`. `CollapsedByDefault`, `EnableCollapsing`, `EnableSelfDrawCollapsing`, `RenderMethod` (parameterless, or taking the plugin instance — DevTree's `Render(DevPlugin)` form). Works on the class or on the property. |
+| `[ConditionalDisplay]` (`ConditionalDisplayAttribute`) | `[ConditionalDisplay]` | present | `Core/Shared/Attributes/ConditionalDisplayAttribute.cs`. Condition may be a parameterless `bool` method, or a `bool`/`ToggleNode` property or field, public or not (ExpeditionIcons uses `internal bool` properties). Re‑evaluated per frame; an unresolvable name is reported once and the property stays visible. |
 
 ### Utilities / extensions
 
