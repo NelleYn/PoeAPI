@@ -209,8 +209,29 @@ public class MyPlugin : BaseSettingsPlugin<MySettings>
 
 Swap `TimeCache` for `FrameCache<List<Entity>>(ScanMonsters)` if you want exactly one scan per rendered frame, or `FramesCache<...>(ScanMonsters, 3)` for every third frame. Call `ForceUpdate()` when external state (e.g. a settings change) must invalidate the cached result immediately.
 
+## `CacheUtils.RememberLastValue<T>`
+
+A standalone helper (not a `CachedValue`) for the "fold over the previous result" pattern: it wraps
+a `Func<T, T>` into a parameterless function that feeds each call whatever the previous call
+returned.
+
+```csharp
+// A frame counter that also remembers the highest entity count seen so far.
+private readonly Func<int> _peakEntities = CacheUtils.RememberLastValue<int>(
+    previousPeak => Math.Max(previousPeak, GameController.Entities.Count));
+
+public override void Render() => Graphics.DrawText($"peak: {_peakEntities()}", position, Color.White);
+```
+
+The running value lives in the returned closure, so each call to `RememberLastValue` gets its own
+independent state, seeded with `initialValue` (default `default(T)`). The closure is **not**
+thread-safe — concurrent calls race on the captured value, so call it from one thread (typically the
+render thread) or guard it yourself. A producer that returns its argument unchanged turns the result
+into a plain "last value" accessor.
+
 ## Source
 
+- `Core/Shared/Cache/CacheUtils.cs` — `RememberLastValue<T>`.
 - `Core/Shared/Cache/CachedValue.cs` — base contract (`Value`, `RealValue`, `ForceUpdate`, `OnUpdate`, `Latency`).
 - `Core/Shared/Cache/FrameCache.cs`, `FramesCache.cs`, `AreaCache.cs`, `TimeCache.cs`, `LatancyCache.cs`, `ConditionalCache.cs`, `StaticValueCache.cs`, `ValidCache.cs` — the policy caches.
 - `Core/Shared/Cache/Cache.cs`, `StaticCache.cs`, `StaticStringCache.cs`, `Core/Shared/Interfaces/IStaticCache.cs` — the static memory caches.

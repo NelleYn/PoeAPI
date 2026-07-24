@@ -90,6 +90,7 @@ Small component bridges plugins expect.
 | `Life.HasBuffSafe(string)` | upstream buff query | `Life.HasBuff(string)` — `Core/PoEMemory/Components/Life.cs:122` | Null-safe wrapper. Named `*Safe` to avoid shadowing the instance `Life.HasBuff`. |
 | `Mods.ImplicitMods()` | `Mods.ImplicitMods : List<ItemMod>` | `Mods.ModsStruct.implicitMods` — `GameOffsets/ModsComponentOffsets.cs:13`; `RemoteMemoryObject.GetObject<T>` — `Core/PoEMemory/RemoteMemoryObject.cs:84` | Reproduces the fork's private `Mods.GetMods(long,long)` walk (0x28-byte stride, capped at 12) over the implicit-only range. |
 | `Mods.ExplicitMods()` | `Mods.ExplicitMods : List<ItemMod>` | same, using `Mods.ModsStruct.explicitMods` — `GameOffsets/ModsComponentOffsets.cs:14` | Same walk, explicit-only range. |
+| `Mods.EnchantedMods()` | `Mods.EnchantedMods : List<ItemMod>` | same, using `Mods.ModsStruct.enchantedMods` — `GameOffsets/ModsComponentOffsets.cs` | Same walk, enchant-only range. The backing offset is **derived** (`0xC0`), not dumped — see the derivation note below and in the offsets file. Fails closed: an implausible range yields an empty list. |
 
 ## `EntityCompat.cs`
 
@@ -105,9 +106,22 @@ The following upstream members from the compatibility doc remain **deliberately 
 because the fork has no underlying member to ground an additive helper on (inventing one would
 mean fabricating offsets/behavior):
 
-- **`Mods.EnchantedMods` / `Mods.IncubatorName`** — `ModsComponentOffsets`
-  (`GameOffsets/ModsComponentOffsets.cs`) has **no** enchant-mods array field and no incubator-name
-  field at all; there is nothing to walk without fabricating an offset.
+- **`Mods.IncubatorName`** — `ModsComponentOffsets` (`GameOffsets/ModsComponentOffsets.cs`) has no
+  incubator-name field, and nothing else in `GameOffsets` describes one; there is nothing to read
+  without fabricating an offset.
+
+  > **`Mods.EnchantedMods` is now implemented** (it used to be listed here alongside
+  > `IncubatorName`). The blocker was stated as "`ModsComponentOffsets` has no enchant-mods array
+  > field", which is true, but a *second* struct in this same repo describes the block:
+  > `ModsAndObjectMagicPropertiesCommonStruct`
+  > (`GameOffsets/Components/ModsAndObjectMagicProperties.cs`) lists `ImplicitModsPtr` /
+  > `ExplicitModsPtr` / `EnchantmentModsPtr` at `0x60`/`0x78`/`0x90` "one after the other", plus the
+  > rule "If looking at this Struct from Mods component, Add `0x30` to each offset". That rule
+  > reproduces every field the two structs share (`UniqueName`, `Identified`, `ItemRarity`,
+  > `implicitMods`, `explicitMods`), and `0x18`-byte array contiguity gives the same answer
+  > independently, so `enchantedMods` sits at `0xC0`. The walk reuses `ParseModRange`, whose
+  > implausible-range guard makes a wrong offset degrade to an empty list rather than fabricated
+  > mods. See `GameOffsets/ModsComponentOffsets.cs` for the full derivation and its one caveat.
 - **`Chest.Rarity`, `Transitionable.CurrentState`, `Actor.ActorVaalSkills`, `Render.Size`,
   `SkillGem.SkillExperience/ExperienceMax`** — no corresponding fork member to wrap (compat doc
   marks these missing/renamed with differing semantics; map by hand per the doc).

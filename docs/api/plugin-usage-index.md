@@ -286,14 +286,23 @@ ExileApi exposes versus this fork, alongside the closest equivalent here.
 | Upstream-only symbol | Used by (file) | This fork's equivalent |
 |---|---|---|
 | `Entity.PosNum` / `GridPosNum` / `WorldPosNum` (`System.Numerics` position accessors) | Radar (`Radar.cs`), ExpeditionIcons, HarvestPicker, PickItV2 (`PickIt.cs`), ReAgent, WhereAreYouGoing, Beasts (`Beasts.cs`), DevTree, Abyss, Blight, WhereTheCirclesAt, WhereTheWispsAt, +others (~20 repos) | `Positioned.GridPos` / `WorldPos` (`Vector2`, SharpDX-typed). **Update (PR #42, `bf1a509`):** `Entity.PosNum` / `GridPosNum` (`System.Numerics` `Vector3`/`Vector2`) now exist (`Core/PoEMemory/MemoryObjects/Entity.cs`) and are documented; only `WorldPosNum` remains unexposed by this fork. |
-| `IMemory.ReadStdVector<T>` / `ReadStdVectorStride<T>` + `StdVector` type | Radar (`Radar.Pathfinding.cs:202`), PathfindSanctum (`RewardHelper.cs:320`) | `Memory.ReadStructsArray`, `ReadDoublePtrVectorClasses`, `ReadNativeArray`, `ReadList<T>`. **Update (PR #42, `668bb93`):** `Memory.ReadStdVector<T>` (both overloads) now exists (`Core/Memory.cs`) and is documented; this fork still has no `ReadStdVectorStride<T>` or a dedicated `StdVector` wrapper type. |
-| `GetComponent<Buffs>()` (a `Buffs` *component*) and `Buffs.BuffsList` | Beasts (`Beasts.cs:117,226`), ReAgent (`RuleState.cs`, `NearbyMonsterInfo.cs`, `FlaskInfo.cs`) | No `Buffs` component in this fork; buffs are on the `Life` component: `Life.Buffs` (`List<Buff>`), `Life.HasBuff(string)`, and the convenience `Entity.Buffs`. (Already noted in components-combat.md.) |
+| ~~`IMemory.ReadStdVector<T>` / `ReadStdVectorStride<T>` + `StdVector` type~~ **(closed)** | Radar (`Radar.Pathfinding.cs:202`), PathfindSanctum (`RewardHelper.cs:320`) | `Memory.ReadStructsArray`, `ReadDoublePtrVectorClasses`, `ReadNativeArray`, `ReadList<T>`. **Update (PR #42, `668bb93`):** `Memory.ReadStdVector<T>` (both overloads) added. **Closed since:** `ReadStdVectorStride<T>` (three overloads, `Core/Shared/Compat/MemoryCompat.cs`) and the `StdVector` header type (`GameOffsets/Native/StdVector.cs`) now exist. |
+| ~~`GetComponent<Buffs>()` (a `Buffs` *component*) and `Buffs.BuffsList`~~ **(closed)** | Beasts (`Beasts.cs:117,226`), ReAgent (`RuleState.cs`, `NearbyMonsterInfo.cs`, `FlaskInfo.cs`) | **Closed since:** `Core/PoEMemory/Components/Buffs.cs` now exists, exposing `BuffsList` / `HasBuff` / `TryGetBuff`. On this fork's build the buff vector still lives in `Life` (`LifeComponentOffsets.Buffs`), so the component delegates to the owning entity's `Life.Buffs` rather than carrying a second build-specific offset — the same list `Entity.Buffs` exposes. |
 | `InventorySlotE.ExpandedMainInventory1` (and the `Expanded*` slot family) | Stashie (`Compartments/StashieSettingsHandler.cs:31`, `Compartments/FilterManager.cs:116`) | This fork's `InventorySlotE` (`Core/Shared/Enums/InventorySlotE.cs`) has `MainInventory1` but not the expanded-backpack slot enumerators. |
 | `InventoryIndex.PlayerExpandedInventory` | Stashie (`Compartments/FilterManager.cs:114`) | This fork has no `PlayerExpandedInventory` index in `InventoryIndex`. |
 
 Note: many of these reflect plugins targeting the newer upstream "compiled ExileApi"
 build (expanded-backpack support, remaining `System.Numerics` position helpers, `Buffs`
 component, a strided/typed `std::vector` reader), which this fork has not fully adopted.
+
+**Update (this branch).** Three of the five families above are now closed — the `Buffs`
+component and the `ReadStdVectorStride<T>` / `StdVector` pair, in addition to the `Entity.*Num`
+row already closed by PR #42. The two **expanded-inventory enum** rows are deliberately left
+open: `InventoryIndex` and `InventorySlotE` are byte-compatible between this fork and the
+client-328.8 reconstruction, and neither contains an `Expanded*` member, so the upstream values
+exist only in the compiled distribution. Their numeric values index live inventory memory, so
+guessing one would silently read the *wrong* inventory rather than fail — the one failure mode
+worth avoiding more than the missing feature. They stay recorded here until a value is dumped.
 PR #42 (2026-07-08) closed the `IngameState.UIHoverElement` gap entirely (`UIHoverElement`
 is now an alias for `UIHover`, `Core/PoEMemory/MemoryObjects/IngameState.cs`) and partially
 closed the `Entity.*Num` and `IMemory.ReadStdVector<T>` gaps, as reflected in the rows

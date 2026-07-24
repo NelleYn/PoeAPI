@@ -136,11 +136,11 @@ Quests: `QuestFlagDat`, `QuestFlagsDat`, `QuestReward(+Offer)`. Mechanic tables:
 `VillageShippingPort`, …), `VillageUniqueDisenchantValue`, `ChestRecord`, `ClientString`,
 `WordEntry`.
 
-### Shared/Nodes (6 absent)
+### Shared/Nodes (5 absent — `CustomNode` has since been added)
 
-`ContentNode`, `ContentNodeConverter`, `IContentNodeBase`, `CustomNode`, `HotkeyNodeV2`,
+`ContentNode`, `ContentNodeConverter`, `IContentNodeBase`, `HotkeyNodeV2`,
 `JsonSerializationHelper`. This fork ships `Toggle/Range/Hotkey/Color/Button/List/Text/File/
-StashTab/Empty` only — see [settings.md](settings.md).
+StashTab/Empty/Custom` — see [settings.md](settings.md).
 
 ### Shared/Attributes (2 absent)
 
@@ -152,13 +152,24 @@ This fork has only `[Menu]` and `[HideInReflection]`.
 `HeistJobE`, `Influence`, `InfluenceTypes`, `InventoryNameE`, `InventoryTabAffinity`,
 `QuestFlag`, `SkillGemQualityTypeE`, `SocketColor`.
 
-### Shared/Helpers (3 absent)
+### Shared/Helpers (2 absent — `MoreLinq/PairwiseExtension` has since been added)
 
-`InputHelper`, `WindowsUtils`, `MoreLinq/PairwiseExtension`.
+`InputHelper`, `WindowsUtils`. Both are `NotImplementedException` stubs in the reconstruction
+(bodies were protected in the DLL), and `InputHelper` is typed in terms of the still-absent
+`HotkeyNodeV2`, so neither can be restored from it — they would have to be written from scratch.
 
-### Shared/Cache (3 absent)
+`ExileCore.Shared.Helpers.MoreLinq.PairwiseExtension` now ships
+(`Core/Shared/Helpers/MoreLinq/PairwiseExtension.cs`), forwarding to the `morelinq` package
+`ExileCore` already references so plugins need no package reference of their own.
 
-`CacheUtils`, `KeyTrackingCache`, `CachedValue.CacheUpdateEvent`.
+### Shared/Cache (2 absent — `CacheUtils` has since been added)
+
+`KeyTrackingCache`, `CachedValue.CacheUpdateEvent`. `KeyTrackingCache` is deliberately **not**
+restored: the reconstruction carries only the static `Create<T,TKey>` factory, while the generic
+`KeyTrackingCache<T,TKey>` class it returns is absent from both trees, so there is nothing to build
+the factory on without inventing the cache's semantics.
+
+`CacheUtils.RememberLastValue<T>` now ships (`Core/Shared/Cache/CacheUtils.cs`).
 
 ### Whole new subsystems
 
@@ -206,7 +217,7 @@ site; the *This fork* column names the in‑repo equivalent (file cited where no
 | --- | --- | --- | --- |
 | `Mods.ImplicitMods` : `List<ItemMod>` | `Mods.ImplicitMods()` extension | compat‑helper | `gcv/Ninja Price/Main/CustomItem.cs:196`. `Core/Shared/Compat/ComponentCompat.cs` walks `ModsStruct.implicitMods` with the same stride/guard as the fork's private `Mods.GetMods`; `Mods.ItemMods` remains the combined list. |
 | `Mods.ExplicitMods` : `List<ItemMod>` | `Mods.ExplicitMods()` extension | compat‑helper | `gcv/.../CustomItem.cs:194`. Same helper family over `ModsStruct.explicitMods` (`Core/Shared/Compat/ComponentCompat.cs`). |
-| `Mods.EnchantedMods` | — | missing | `stashie/ItemData.cs:109` `modsComp?.EnchantedMods?.Count`. Not in fork `Mods`. |
+| `Mods.EnchantedMods` : `List<ItemMod>` | `Mods.EnchantedMods()` extension | compat‑helper | `stashie/ItemData.cs:109` `modsComp?.EnchantedMods?.Count`. `Core/Shared/Compat/ComponentCompat.cs` walks `ModsStruct.enchantedMods` with the same stride/guard as `ImplicitMods`/`ExplicitMods`. The backing offset (`0xC0`, `GameOffsets/ModsComponentOffsets.cs`) is **derived, not dumped**: `ModsAndObjectMagicPropertiesCommonStruct` documents the implicit/explicit/enchantment arrays at `0x60`/`0x78`/`0x90` plus the rule "add `0x30` from the Mods component", which reproduces `UniqueName`/`Identified`/`ItemRarity`/`implicitMods`/`explicitMods` exactly; `0x18`-byte array contiguity gives the same answer. A wrong offset degrades to an empty list, never fabricated mods. |
 | `Mods.IncubatorName` | — | missing | No incubator member on fork `Mods`. |
 | `Stack.MaxSize` | `Stack.MaxSize()` extension | compat‑helper | `Core/PoEMemory/Components/Stack.cs` exposes `Size` and `Info`; the helper (`Core/Shared/Compat/ComponentCompat.cs`) reads `Stack.Info.MaxStackSize` via `CurrencyInfo`, returning `0` when unavailable. |
 | `SkillGem.SkillExperience` / `ExperienceMax` | `ExperienceMaxLevel`, `ExperiencePrevLevel`, `ExperienceToNextLevel` | renamed | `Core/PoEMemory/Components/SkillGem.cs:31‑34`. Names/semantics differ; map carefully. |
@@ -261,14 +272,17 @@ site; the *This fork* column names the in‑repo equivalent (file cited where no
 
 | Upstream member | This fork | Status | Notes |
 | --- | --- | --- | --- |
-| `IMemory.ReadStdVector<T>(...)` / `Memory.ReadStdVector<T>` | `IMemory.ReadStdVector<T>` (instance + extensions) | present / compat‑helper | `Radar/Radar.Pathfinding.cs:202`. Fork now has instance overloads reading the vector header from a pointer (`Core/Shared/Interfaces/IMemory.cs:58,64`); `Core/Shared/Compat/MemoryCompat.cs` adds the upstream shapes over `NativePtrArray` / raw begin‑end bounds for unmanaged structs. For `RemoteMemoryObject` vectors / pointer vectors use `ReadStructsArray<T>` / `ReadNativeArray<T>` (`Core/Memory.cs:138`, `:531`). |
+| `IMemory.ReadStdVector<T>(...)` / `Memory.ReadStdVector<T>` | `IMemory.ReadStdVector<T>` (instance + extensions) | present / compat‑helper | `Radar/Radar.Pathfinding.cs:202`. Fork now has instance overloads reading the vector header from a pointer (`Core/Shared/Interfaces/IMemory.cs:58,64`); `Core/Shared/Compat/MemoryCompat.cs` adds the upstream shapes over `NativePtrArray` / `StdVector` / raw begin‑end bounds for unmanaged structs. For `RemoteMemoryObject` vectors / pointer vectors use `ReadStructsArray<T>` / `ReadNativeArray<T>` (`Core/Memory.cs:138`, `:531`). |
+| `IMemory.ReadStdVectorStride<T>(...)` | `IMemory.ReadStdVectorStride<T>` extensions | compat‑helper | `Core/Shared/Compat/MemoryCompat.cs` — three overloads (`NativePtrArray` / `StdVector` / raw begin‑end), each forwarding to the existing explicit‑element‑size `ReadStdVector<T>`, which already implements exactly this. Only the first `sizeof(T)` bytes of each stride are decoded. |
+| `GameOffsets.Native.StdVector` | `StdVector` | present | `GameOffsets/Native/StdVector.cs` — layout‑identical to `NativePtrArray` (three sequential 8‑byte pointers), added so ported call sites compile under the name they use. `FromNativePtrArray` converts in; there is no reverse conversion because `NativePtrArray`'s fields are `readonly` with no constructor. Prefer `NativePtrArray` in new fork code. |
 
 ### Settings / Nodes / Attributes
 
 | Upstream member | This fork | Status | Notes |
 | --- | --- | --- | --- |
 | `ContentNode<T>` / `IContentNodeBase` | — | missing | List‑of‑sub‑settings node; not in fork. (`Core/Shared/Nodes/ContentNode.cs` exists in reconstruction.) |
-| `CustomNode`, `HotkeyNodeV2` | `HotkeyNode` | missing | Fork has the v1 `HotkeyNode` only. |
+| `CustomNode` | `CustomNode` | present | `Core/Shared/Nodes/CustomNode.cs` — holds a `[JsonIgnore]` `DrawDelegate` invoked by `SettingsParser` where the node appears (same treatment as `ButtonNode.OnPressed`). Holds no value and is not persisted. |
+| `HotkeyNodeV2` / `HotkeyNodeValue` | `HotkeyNode` | missing | Fork has the v1 `HotkeyNode` only. Used by DevTree, IFLI, Preloads, ReAgent. |
 | `[Submenu]` (`SubmenuAttribute`) | — | missing | Use `[Menu]` nesting; `Core/Shared/Attributes/`. |
 | `[ConditionalDisplay]` (`ConditionalDisplayAttribute`) | — | missing | No conditional‑visibility attribute here. |
 

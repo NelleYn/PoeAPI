@@ -7,7 +7,8 @@ namespace ExileCore.Shared;
 /// <summary>
 /// Small per-component helpers that bridge fork member names to the shapes ExileApi-Compiled
 /// plugins expect: <c>Stack.MaxSize</c>, an upstream-style <c>Life.GetBuffs()</c> accessor, and the
-/// per-affix-category <c>Mods.ImplicitMods</c> / <c>Mods.ExplicitMods</c> accessors.
+/// per-affix-category <c>Mods.ImplicitMods</c> / <c>Mods.ExplicitMods</c> / <c>Mods.EnchantedMods</c>
+/// accessors.
 /// </summary>
 public static class ComponentCompat
 {
@@ -100,6 +101,34 @@ public static class ComponentCompat
             return new List<ItemMod>();
 
         var range = mods.ModsStruct.explicitMods;
+        return ParseModRange(mods, range.First, range.Last);
+    }
+
+    /// <summary>
+    /// Emulates upstream <c>Mods.EnchantedMods</c>: the item's enchantment modifiers only (labyrinth
+    /// enchants and similar), which the fork's combined <c>Mods.ItemMods</c> does not include at all.
+    /// </summary>
+    /// <param name="mods">The mods component.</param>
+    /// <returns>
+    /// The enchantment modifiers, or an empty list when <paramref name="mods"/> is <c>null</c>, has no
+    /// address, the item carries no enchants, or the range looks corrupt. Walked exactly like
+    /// <see cref="ImplicitMods"/>/<see cref="ExplicitMods"/>, over
+    /// <c>Mods.ModsStruct.enchantedMods</c> (<c>GameOffsets/ModsComponentOffsets.cs</c>).
+    /// Used upstream by e.g. <c>stashie/ItemData.cs:109</c> (<c>modsComp?.EnchantedMods?.Count</c>).
+    /// </returns>
+    /// <remarks>
+    /// The <c>enchantedMods</c> offset is <b>derived</b> rather than dumped — see the comment on that
+    /// field for the derivation and its cross-checks. Because <see cref="ParseModRange"/> rejects an
+    /// implausible range, a bad offset degrades to an empty list (feature silently unavailable) instead
+    /// of surfacing fabricated mods; treat a persistently empty result on a known-enchanted item as the
+    /// signal to re-dump the offset.
+    /// </remarks>
+    public static List<ItemMod> EnchantedMods(this Mods mods)
+    {
+        if (mods == null)
+            return new List<ItemMod>();
+
+        var range = mods.ModsStruct.enchantedMods;
         return ParseModRange(mods, range.First, range.Last);
     }
 

@@ -99,6 +99,14 @@ public static class SettingsParser
                 case EmptyNode n:
 
                     break;
+                // The node supplies its own ImGui drawing instead of mapping to a built-in control.
+                // The field is read at draw time (not captured), so a plugin may swap the callback
+                // after the menu is built; ?.Invoke() keeps a node whose delegate is null or has been
+                // cleared a silent no-op, like EmptyNode, instead of throwing on the render thread.
+                case CustomNode n:
+                    holder.DrawDelegate = () => n.DrawDelegate?.Invoke();
+
+                    break;
                 case HotkeyNode n:
                     holder.DrawDelegate = () =>
                     {

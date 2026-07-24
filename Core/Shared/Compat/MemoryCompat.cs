@@ -69,6 +69,71 @@ public static class MemoryCompat
     }
 
     /// <summary>
+    /// Emulates upstream <c>IMemory.ReadStdVector&lt;T&gt;</c> over a <see cref="StdVector"/> header —
+    /// the name ExileApi-Compiled plugins use for the same begin/end/capacity triple.
+    /// </summary>
+    /// <typeparam name="T">The unmanaged element struct type.</typeparam>
+    /// <param name="memory">The process memory reader.</param>
+    /// <param name="stdVector">The vector header.</param>
+    /// <returns>The decoded elements, or an empty list when the bounds look invalid.</returns>
+    public static List<T> ReadStdVector<T>(this IMemory memory, StdVector stdVector)
+        where T : unmanaged
+    {
+        return memory.ReadStdVector<T>(stdVector.First, stdVector.Last, Marshal.SizeOf<T>());
+    }
+
+    /// <summary>
+    /// Emulates upstream <c>IMemory.ReadStdVectorStride&lt;T&gt;</c>: the same read as
+    /// <see cref="ReadStdVector{T}(IMemory, NativePtrArray)"/> but with an explicit stride, for vectors
+    /// whose element spacing is larger than <see cref="Marshal.SizeOf{T}()"/> (a partially-mapped
+    /// element struct, or padding the managed mirror omits).
+    /// </summary>
+    /// <typeparam name="T">The unmanaged element struct type.</typeparam>
+    /// <param name="memory">The process memory reader.</param>
+    /// <param name="nativePtrArray">The vector header (<c>First</c> = begin, <c>Last</c> = one past end).</param>
+    /// <param name="stride">The distance, in bytes, between consecutive elements.</param>
+    /// <returns>The decoded elements, or an empty list when the bounds look invalid.</returns>
+    /// <remarks>
+    /// Upstream exposes this under its own name; here it forwards to the existing explicit-element-size
+    /// <c>ReadStdVector&lt;T&gt;</c> overload, which already implements exactly this behaviour. Only
+    /// the first <c>sizeof(T)</c> bytes of each stride are decoded; the remainder is skipped.
+    /// </remarks>
+    public static List<T> ReadStdVectorStride<T>(this IMemory memory, NativePtrArray nativePtrArray, int stride)
+        where T : unmanaged
+    {
+        return memory.ReadStdVector<T>(nativePtrArray.First, nativePtrArray.Last, stride);
+    }
+
+    /// <summary>
+    /// Emulates upstream <c>IMemory.ReadStdVectorStride&lt;T&gt;</c> over a <see cref="StdVector"/> header.
+    /// </summary>
+    /// <typeparam name="T">The unmanaged element struct type.</typeparam>
+    /// <param name="memory">The process memory reader.</param>
+    /// <param name="stdVector">The vector header.</param>
+    /// <param name="stride">The distance, in bytes, between consecutive elements.</param>
+    /// <returns>The decoded elements, or an empty list when the bounds look invalid.</returns>
+    public static List<T> ReadStdVectorStride<T>(this IMemory memory, StdVector stdVector, int stride)
+        where T : unmanaged
+    {
+        return memory.ReadStdVector<T>(stdVector.First, stdVector.Last, stride);
+    }
+
+    /// <summary>
+    /// Emulates upstream <c>IMemory.ReadStdVectorStride&lt;T&gt;</c> from raw begin/end addresses.
+    /// </summary>
+    /// <typeparam name="T">The unmanaged element struct type.</typeparam>
+    /// <param name="memory">The process memory reader.</param>
+    /// <param name="startAddress">Address of the first element (<c>begin</c>).</param>
+    /// <param name="endAddress">Address one past the last element (<c>end</c>).</param>
+    /// <param name="stride">The distance, in bytes, between consecutive elements.</param>
+    /// <returns>The decoded elements, or an empty list when the bounds look invalid.</returns>
+    public static List<T> ReadStdVectorStride<T>(this IMemory memory, long startAddress, long endAddress, int stride)
+        where T : unmanaged
+    {
+        return memory.ReadStdVector<T>(startAddress, endAddress, stride);
+    }
+
+    /// <summary>
     /// Emulates upstream <c>IMemory.ReadStdVector&lt;T&gt;</c> from raw begin/end addresses.
     /// </summary>
     /// <typeparam name="T">The unmanaged element struct type.</typeparam>

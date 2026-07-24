@@ -256,6 +256,25 @@ It reports through its static `PerformanceTimer.Logger`; set `PerformanceTimer.I
 
 This repo's `DictionaryExtensions` provides `MergeLeft<T, TK, TV>(this T me, params IDictionary<TK,TV>[] others)` — returns a new dictionary with `others` merged over the receiver (later dictionaries win on key collisions). (There is no `GetValueOrDefault` here; use the BCL `Dictionary.GetValueOrDefault` for that.)
 
+### `MoreLinq.PairwiseExtension` — adjacent-pair projection
+
+`ExileCore.Shared.Helpers.MoreLinq.PairwiseExtension` exposes
+`Pairwise<TSource, TResult>(this IEnumerable<TSource> source, Func<TSource, TSource, TResult> resultSelector)`,
+which projects each pair of *adjacent* elements into one result — handy for turning a path into its
+segments:
+
+```csharp
+using ExileCore.Shared.Helpers.MoreLinq;
+
+// total length of a walked path
+var length = pathPoints.Pairwise((a, b) => Vector2.Distance(a, b)).Sum();
+```
+
+It yields one element fewer than the source (nothing for a source of zero or one element) and is
+lazily evaluated. This is a thin forward to the `morelinq` package that `ExileCore` already
+references, so plugins get the operator without taking their own package reference; behaviour is
+MoreLINQ's, not a reimplementation.
+
 ---
 
 ## Examples

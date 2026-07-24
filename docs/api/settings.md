@@ -80,6 +80,7 @@ Each node is a thin wrapper around a value. Most expose implicit conversions to/
 | `FileNode` | `string` | File tree (`config/`) | implicit ↔ `string`; `OnFileChanged` event |
 | `StashTabNode` | (stash tab ref) | (custom) | holds `Name`/`VisibleIndex`; not auto-drawn |
 | `EmptyNode` | — | nothing | placeholder used as a `[Menu]` group root |
+| `CustomNode` | — | whatever `DrawDelegate` draws | plugin-supplied ImGui; holds no value, not persisted |
 
 ### ToggleNode
 
@@ -211,6 +212,27 @@ A valueless placeholder. It draws nothing, but combined with a `[Menu]` index it
 public EmptyNode PerformanceRoot { get; set; } = new EmptyNode();
 ```
 
+### CustomNode
+
+An entry that draws itself. Instead of mapping to a built-in widget, the menu invokes
+`DrawDelegate` at the point where the node appears, so a plugin can place arbitrary ImGui widgets
+inside the generated settings tree.
+
+```csharp
+[Menu("Live stats", 200)]
+public CustomNode Stats { get; set; } = new CustomNode(() =>
+{
+    ImGui.TextUnformatted($"Tracked entities: {_tracked.Count}");
+    ImGui.ProgressBar(_scanProgress);
+});
+```
+
+The delegate is `[JsonIgnore]`d (as `ButtonNode.OnPressed` is), so nothing about this node is
+persisted — any state the custom UI edits must live in other nodes if it should survive a restart.
+It is read from the field on each draw, so it may be reassigned after the menu is built, and a
+`null` delegate simply draws nothing. It runs on the render thread, once per frame while the
+plugin's settings are open, so keep it cheap and non-blocking.
+
 ---
 
 ## Attributes
@@ -299,6 +321,7 @@ For each public property (in declaration order):
 | `RangeNode<long>` | `SliderInt` (cast) |
 | `RangeNode<Vector2>` | `SliderFloat2` |
 | `EmptyNode` | none (group root) |
+| `CustomNode` | none built-in — invokes `DrawDelegate` |
 | anything else | logs a "not supported" warning |
 
 The produced `SettingsHolder.Draw()` renders the widget; holders with children render their children inside a bordered child region (or tab) labelled with `Name` and an optional `(?)` tooltip.
