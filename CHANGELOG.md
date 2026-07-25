@@ -1,3 +1,12 @@
+## 2026-07-25
+
+### Other
+
+- `ef01ab9` Implement [Submenu], [ConditionalDisplay], ContentNode<T> and HotkeyNodeV2
+- `ebb5022` Re-verify the 45-plugin audit from fresh clones; correct it and close one more gap
+- `e5ecbf1` Restore ExileApi-Compiled API surface that reference plugins actually use
+
+
 ## 2026-07-23
 
 ### Chores
