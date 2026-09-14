@@ -219,3 +219,7 @@ project.lock.json
 
 # Claude Code agent worktrees / local state
 .claude/
+
+# Сборка вспомогательных инструментов паритета
+tools/*/bin/
+tools/*/obj/

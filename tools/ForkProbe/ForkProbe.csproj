@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Зонд по РЕАЛЬНЫМ сборкам установленного форка ExileApi (ExileCore.dll / GameOffsets.dll):
+    отвечает на вопрос «как этот член памяти зовётся на ЭТОЙ сборке» БЕЗ запуска игры.
+    Мотив — см. docs/OPTIMIZATION_LOG.md, раздел «Локальная сессия 2026-09-14»: слой высот
+    полтора месяца считали сломанным из-за «неугаданного имени члена», а зонд за минуту показал,
+    что имя угадано верно с первого раза и причина была совсем в другом.
+
+    Читает ТОЛЬКО метаданные (MetadataLoadContext), кода форка не исполняет и в память игры не
+    лезет — поэтому запускается на любой машине, где просто лежат DLL.
+
+    Проект намеренно standalone: в решение/сборку плагина не входит (csproj исключает tools\**),
+    свой TFM без -windows, запускается вручную. См. Program.cs — там режимы и примеры.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RootNamespace>MovementHelperPoe.Tools.ForkProbe</RootNamespace>
+    <AssemblyName>ForkProbe</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>
