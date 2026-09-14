@@ -12,9 +12,10 @@
 #
 # Ненулевой код возврата = есть незакрытые строки. Это НЕ ошибка сборки: это счётчик работы.
 #
-# НЕ запускать одновременно со сборкой решения: скрипт читает ExileCore.dll из папки сборки, и
-# если её в этот момент перезаписывают, счёт расходится на строку-другую. Замечено на прогоне,
-# где сборка и счётчик стояли в одной команде: 84 против стабильных 83 в трёх последующих.
+# Зонд вызывается БИНАРНИКОМ, а не через `dotnet run`, и это не косметика. `dotnet run` пишет
+# вывод сборки в тот же stdout, что и программа: первый прогон после правки зонда подмешивал в
+# TSV строку предупреждения компилятора, awk считал её за строку спеки, и счётчик показывал 84
+# вместо 83. Счётчик, чьё число зависит от того, собирался ли проект в этот раз, — бесполезен.
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/.." && pwd)"
@@ -27,8 +28,20 @@ if [ ! -f "$target/ExileCore.dll" ]; then
 fi
 
 out="$(mktemp -t parity.XXXXXX.tsv)"
-dotnet run -c Release --project "$here/ForkProbe" -- "$target" --spec "$here/ForkProbe/surface.json" \
-    > "$out" 2>"$out.err"
+exe="$here/ForkProbe/bin/Release/net10.0/ForkProbe.exe"
+
+# Сборка отдельно и в свой лог: её вывод не имеет права попасть в таблицу.
+if ! dotnet build -c Release "$here/ForkProbe/ForkProbe.csproj" --nologo -v q >"$out.build" 2>&1; then
+  echo "зонд не собрался:"
+  cat "$out.build"
+  exit 2
+fi
+if [ ! -f "$exe" ]; then
+  echo "нет $exe после сборки"
+  exit 2
+fi
+
+"$exe" "$target" --spec "$here/ForkProbe/surface.json" > "$out" 2>"$out.err"
 rc=$?
 
 if [ "$full" = "--full" ]; then
