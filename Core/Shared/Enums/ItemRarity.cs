@@ -9,6 +9,8 @@ namespace ExileCore.Shared.Enums
         Gem,
         Currency,
         Quest,
-        Prophecy
+        Prophecy,
+
+        Unknown = -1,
     }
 }

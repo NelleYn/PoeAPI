@@ -124,13 +124,20 @@ switch (mode)
                                   // Реализуемые интерфейсы: без них --dump молчал о том, что
                                   // IMemoryBackend наследует IDisposable, и попытка реализовать его
                                   // по одному лишь списку методов давала CS0535.
-                                  $"impl={Try(() => string.Join(",", t.GetInterfaces().Select(i => i.Name)))}");
+                                  $"impl={Try(() => string.Join(",", t.GetInterfaces().Select(i => i.Name)))}" +
+                                  // [Flags] не выводится из значений надёжно (набор 0,1,2 бывает и
+                                  // у обычного enum), а без него перенесённый enum ведёт себя иначе
+                                  // при ToString и HasFlag. Атрибут лежит в метаданных — читаем его.
+                                  Try(() => t.GetCustomAttributesData()
+                                             .Any(x => x.AttributeType.Name == "FlagsAttribute") ? "  [Flags]" : ""));
                 foreach (var p in t.GetProperties(Flags).OrderBy(p => p.Name))
                     Line($"  prop {p.Name,-40} : ", () => Sig(p.PropertyType) + Accessors(p));
                 foreach (var f in t.GetFields(Flags).OrderBy(f => f.Name))
                     Line($"  fld  {f.Name,-40} : ", () => Sig(f.FieldType));
                 foreach (var f in t.GetFields(StaticFlags).OrderBy(f => f.Name))
-                    Line($"  sfld {f.Name,-40} : ", () => Sig(f.FieldType)); // значения enum видны здесь
+                    // Для enum и const печатаем ЧИСЛО: без него член enum нельзя перенести в другую
+                    // сборку — имя без значения бесполезно, а угадывать значения запрещено.
+                    Line($"  sfld {f.Name,-40} : ", () => Sig(f.FieldType) + ConstValue(f));
                 foreach (var p in t.GetProperties(StaticFlags).OrderBy(p => p.Name))
                     Line($"  sprop {p.Name,-39} : ", () => Sig(p.PropertyType) + Accessors(p));
                 foreach (var m in t.GetMethods(Flags).Where(m => !m.IsSpecialName).OrderBy(m => m.Name))
@@ -374,6 +381,19 @@ static bool LooksJagged(Type t)
     if (!t.IsArray || t.GetArrayRank() != 1) return false;
     var e = t.GetElementType();
     return e != null && e.IsArray && e.GetArrayRank() == 1;
+}
+
+// Значение константы/члена enum, если оно есть. GetRawConstantValue работает и в
+// MetadataLoadContext (читает метаданные, а не исполняет код), поэтому доступно без игры.
+static string ConstValue(FieldInfo f)
+{
+    if (!f.IsLiteral) return "";
+    try
+    {
+        object? v = f.GetRawConstantValue();
+        return v == null ? "" : $" = {Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture)}";
+    }
+    catch { return ""; }
 }
 
 // Список параметров метода в короткой подписи.

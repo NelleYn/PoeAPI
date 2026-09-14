@@ -7,6 +7,7 @@ namespace ExileCore.Shared.Enums
         Original = 1,
         The_Awakening = 2,
         War_for_the_Atlas = 4,
-        Bestiary = 5
+        Bestiary = 5,
+        Ritual = 7
     }
 }
