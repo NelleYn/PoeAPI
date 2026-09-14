@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ExileCore.Shared.Cache;
 using ExileCore.Shared.Enums;
@@ -108,6 +108,20 @@ namespace ExileCore.PoEMemory.MemoryObjects
             return false;
         }
 
+        /// <summary>
+        /// Upper bound on nodes walked while reading the game-state map. The map holds a handful of
+        /// entries (13 in the reference client), so this is generous by three orders of magnitude.
+        ///
+        /// It exists because the walk is driven entirely by pointers read out of the game: when the
+        /// offsets no longer match the running client, <see cref="GameStateHashNode.IsNull"/> reads a
+        /// byte of unrelated memory and almost never says "null", so Previous/Next keep yielding fresh
+        /// garbage addresses and both the stack and the dictionary grow without end. Observed
+        /// 2026-09-14 against a client this fork's signatures do not match: two processes reached
+        /// ~4 GiB working set each before being killed. Same guard, and the same wording of the log,
+        /// as ServerInventory.ReadHashMap.
+        /// </summary>
+        private const int MaxHashMapNodes = 512;
+
         private Dictionary<string, GameState> ReadHashMap(long pointer)
         {
             var result = new Dictionary<string, GameState>();
@@ -116,6 +130,8 @@ namespace ExileCore.PoEMemory.MemoryObjects
             var startNode = ReadObject<GameStateHashNode>(pointer);
             var item = startNode.Root;
             stack.Push(item);
+
+            var limitMax = MaxHashMapNodes;
 
             while (stack.Count != 0)
             {
@@ -133,6 +149,17 @@ namespace ExileCore.PoEMemory.MemoryObjects
 
                 if (!next.IsNull)
                     stack.Push(next);
+
+                if (limitMax-- < 0)
+                {
+                    // Visible, not silent: an unbounded walk here means the offsets are wrong, and
+                    // that is worth saying out loud rather than returning a half-read map.
+                    DebugWindow.LogError(
+                        $"Fixed possible memory leak (GameStateContoller.ReadHashMap): walked over " +
+                        $"{MaxHashMapNodes} nodes from 0x{pointer:X}; game state offsets likely do not " +
+                        "match the running client.");
+                    break;
+                }
             }
 
             return result;

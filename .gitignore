@@ -223,3 +223,5 @@ project.lock.json
 # Сборка вспомогательных инструментов паритета
 tools/*/bin/
 tools/*/obj/
+tools/SanityRead/bin/
+tools/SanityRead/obj/

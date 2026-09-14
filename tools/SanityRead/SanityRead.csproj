@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SanityRead — единственный вопрос: числа ЭТОГО форка верны для той игры, что стоит на машине?
+
+    Форк никогда не запускался (в каталоге сборки нет ни логов, ни конфигов), а измерения в
+    docs/api/parity-measured.md показывают, что он и эталонный ExileApi-Compiled нацелены на разные
+    сборки игры. Пока никто не приложился этими оффсетами к живому процессу, вся работа по паритету —
+    ставка. Инструмент прикладывается и печатает таблицу «что прочитали / похоже ли на правду».
+
+    ТОЛЬКО ЧТЕНИЕ: хэндл процесса открывается с ProcessAccessFlags.VirtualMemoryRead (см. Memory.cs),
+    записи в чужую память, ввода и внедрения нет ни одного. Оверлея/DirectX/ImGui/плагинов/корутин
+    тоже нет — консольное приложение отрабатывает и выходит.
+
+    Проект НАМЕРЕННО не входит в ExileApi.sln: решение собирают ради ExileCore/GameOffsets/Loader,
+    и лишний Exe в нём сломал бы чужую сборку. Собирать отдельно:
+      dotnet build -c Release tools\SanityRead\SanityRead.csproj
+    Запускать:
+      tools\SanityRead\bin\Release\net10.0-windows\SanityRead.exe
+
+    ProjectReference (а не ссылки на готовые DLL) — принципиально: читать нужно ИМЕННО теми
+    оффсетами, что лежат в репозитории, иначе инструмент проверял бы чужие числа.
+
+    UseWindowsForms — вынужденно: ExileCore собран с ним (Core.csproj), и без этого флага ссылка на
+    него не компилируется. Ни одной формы здесь не создаётся.
+    PlatformTarget x64 — ExileCore/GameOffsets собраны под x64, и читаем мы 64-битный процесс.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Platforms>AnyCPU;x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ExileApi.Tools.SanityRead</RootNamespace>
+    <AssemblyName>SanityRead</AssemblyName>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\Core.csproj" />
+    <ProjectReference Include="..\..\GameOffsets\GameOffsets.csproj" />
+  </ItemGroup>
+
+</Project>
