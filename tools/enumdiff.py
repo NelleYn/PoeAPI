@@ -16,10 +16,18 @@
 
 Код возврата: 0 — расхождений значений и дублей нет; 1 — есть (только при --strict).
 """
+import io
 import os
 import re
 import subprocess
 import sys
+
+# Вывод целиком русский, а консоль Windows по умолчанию не UTF-8: без этого скрипт падал
+# UnicodeEncodeError'ом на первой же строке отчёта (cp1252) и возвращал 1 БЕЗ отчёта — то есть
+# выглядел как «проверка не прошла», хотя проверка даже не начиналась.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROBE = os.path.join(ROOT, 'tools', 'ForkProbe', 'bin', 'Release', 'net10.0', 'ForkProbe.exe')
