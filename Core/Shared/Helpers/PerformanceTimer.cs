@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Threading;
 using Serilog;
@@ -65,8 +65,21 @@ public struct PerformanceTimer : IDisposable
 
             if (Log)
             {
-                Logger.Information(
-                    $"PerfTimer =-> {DebugText} ({elapsed.TotalMilliseconds} ms) Thread #[{Thread.CurrentThread.ManagedThreadId}]");
+                // Логирование не имеет права ронять вызывающего. Сток логов настраивает хост, и вне
+                // хоста (консольный инструмент, тест, ранний старт) его может не быть вовсе — тогда
+                // запись бросает NullReferenceException и уносит с собой конструктор TheGame,
+                // которому до логов нет дела. Ровно так падал tools/SanityRead: стек показывал
+                // PerformanceTimer.StopAndPrint посреди FilesContainer, хотя чтение памяти было
+                // исправно. Замер — диагностика, и её отказ обязан оставаться диагностикой.
+                try
+                {
+                    Logger.Information(
+                        $"PerfTimer =-> {DebugText} ({elapsed.TotalMilliseconds} ms) Thread #[{Thread.CurrentThread.ManagedThreadId}]");
+                }
+                catch
+                {
+                    // сток логов не настроен — замер молча пропускается
+                }
             }
 
             FinishedCallback?.Invoke(DebugText, elapsed);

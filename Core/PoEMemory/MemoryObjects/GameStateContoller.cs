@@ -35,7 +35,7 @@ namespace ExileCore.PoEMemory.MemoryObjects
             Address = m.Read<long>(m.BaseOffsets[OffsetsName.GameStateOffset] + m.AddressOfProcess);
             _AreaChangeCount = new TimeCache<int>(() => M.Read<int>(M.AddressOfProcess + M.BaseOffsets[OffsetsName.AreaChangeCount]), 50);
 
-            AllGameStates = ReadHashMap(Address + 0x48);
+            AllGameStates = ReadGameStates(Address);
 
             PreGameStatePtr = AllGameStates["PreGameState"].Address;
             LoginStatePtr = AllGameStates["LoginState"].Address;
@@ -122,6 +122,76 @@ namespace ExileCore.PoEMemory.MemoryObjects
         /// </summary>
         private const int MaxHashMapNodes = 512;
 
+        /// <summary>Offset of the game-state array inside the controller object.</summary>
+        private const int GameStateArrayOffset = 0x48;
+
+        /// <summary>Stride of one entry: a pair of pointers to two base subobjects of one state.</summary>
+        private const int GameStateArrayStride = 0x10;
+
+        /// <summary>
+        /// Reads the game states as an ARRAY indexed by <see cref="GameStateTypes"/>.
+        ///
+        /// The client used to expose them as a std::map keyed by the state name, which is what
+        /// <see cref="ReadHashMap"/> below walks. That map is gone from the client observed
+        /// 2026-09-14: at controller+0x48 there is now a plain array of 12 entries, stride 0x10,
+        /// each entry a pair (state + 0x10, state) — the two base subobjects of one state object
+        /// under multiple inheritance. Twelve is exactly <see cref="GameStateTypes"/> minus its
+        /// synthetic <c>GameNotLoaded</c>, and the array ends at 0x48 + 12 * 0x10 = 0x108, right
+        /// where unrelated data begins.
+        ///
+        /// The index order is not assumed: it was confirmed against the client's own list of
+        /// ACTIVE states (controller+0x20), whose single entry pointed at slot 4 while the client
+        /// was in game — matching <c>GameStateTypes.InGameState == 4</c>.
+        ///
+        /// The address stored per state is <c>state + 0x10</c>, because that is what the active
+        /// list holds and what <see cref="GameStateActive"/> compares against.
+        ///
+        /// Names, not indices, are the key of the returned dictionary, so every existing caller
+        /// (<c>AllGameStates["InGameState"]</c> and friends) keeps working unchanged.
+        /// </summary>
+        private Dictionary<string, GameState> ReadGameStates(long controller)
+        {
+            var result = new Dictionary<string, GameState>();
+
+            var moduleBase = M.AddressOfProcess;
+            var moduleEnd = moduleBase + M.Process.MainModule.ModuleMemorySize;
+
+            foreach (GameStateTypes type in Enum.GetValues(typeof(GameStateTypes)))
+            {
+                var index = (int)type;
+
+                // GameNotLoaded is synthetic: the client has no object for it.
+                if (index < 0 || index >= 12) continue;
+
+                var entry = M.Read<long>(controller + GameStateArrayOffset + index * GameStateArrayStride);
+                if (entry == 0) continue;
+
+                // A real state object starts with a vtable pointer into the game module. Checking it
+                // keeps a stale layout from filling the dictionary with plausible-looking garbage —
+                // the failure mode this whole subsystem was rewritten to escape.
+                var primary = entry - 0x10;
+                var vtable = M.Read<long>(primary);
+
+                if (vtable < moduleBase || vtable >= moduleEnd)
+                {
+                    DebugWindow.LogError(
+                        $"GameState '{type}' (index {index}) at 0x{primary:X} has no vtable inside the " +
+                        "game module: the game-state array layout does not match this client.");
+                    continue;
+                }
+
+                result[type.ToString()] = GetObject<GameState>(entry);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Walks a std::map keyed by a native string. NO LONGER USED for game states — the client
+        /// dropped that map (see <see cref="ReadGameStates"/>). Kept because it documents the old
+        /// layout for the next patch-day comparison, and because its bound is the record of a real
+        /// incident: without it, a walk over a stale pointer grew the process to ~4 GiB.
+        /// </summary>
         private Dictionary<string, GameState> ReadHashMap(long pointer)
         {
             var result = new Dictionary<string, GameState>();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -402,6 +402,10 @@ internal static class Program
         {
             Row("TheGame", $"исключение {e.GetType().Name}", "конструктор проходит целиком", Verdict.Bad);
             Console.WriteLine($"       └ {Oneline(e.Message)}");
+            // Место падения важнее текста: имя метода в стеке сразу называет слой, чья раскладка
+            // разошлась с клиентом. Без него приходится гадать по сообщению.
+            foreach (var frame in (e.StackTrace ?? "").Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).Take(6))
+                Console.WriteLine($"       │ {Oneline(frame)}");
             Console.WriteLine();
             Console.WriteLine("  Цепочка оборвана на корне: дальше читать не из чего.");
             Console.WriteLine("  Это и есть ответ — GameStateOffset/раскладка хэш-мапы состояний не от этой сборки.");
