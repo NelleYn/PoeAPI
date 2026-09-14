@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    FindOffset — the second half of the offset-recovery loop that tools/SanityRead started.
+
+    SanityRead answers "are this fork's numbers right for the installed game?". When the answer is
+    "no" for a STRUCTURAL offset (the first one being IngameStateOffsets.Data, 0x370, which reads
+    as zero), the recovery method is always the same: the reference ExileApi-Compiled distribution
+    reads the SAME process correctly and hands out the TRUE address through a public property; our
+    object's base address is known; the offset is simply the difference. FindOffset is the tool that
+    computes that difference — and, when the true address is not known yet, lets the window be read
+    by eye.
+
+    READ ONLY: the process handle is opened with PROCESS_VM_READ | PROCESS_QUERY_INFORMATION only
+    (see OpenReadHandle). There is not a single write, no input, no injection. No overlay, no
+    DirectX, no ImGui, no plugins, no coroutines — a console app that runs and exits.
+
+    DELIBERATELY NOT part of ExileApi.sln: the solution is built for ExileCore/GameOffsets/Loader,
+    and an extra Exe in it would break somebody else's build. Build it on its own:
+      dotnet build -c Release tools\FindOffset\FindOffset.csproj
+    Run:
+      tools\FindOffset\bin\Release\net10.0-windows\FindOffset.exe   (no arguments prints the usage)
+
+    ProjectReference (not references to prebuilt DLLs) is the point, exactly as in SanityRead: the
+    ingame-state mode must resolve the address with THIS repository's offsets, otherwise the tool
+    would be measuring somebody else's numbers.
+
+    UseWindowsForms is forced: ExileCore is built with it (Core.csproj), and without the flag a
+    reference to it does not compile. No form is ever created here.
+    PlatformTarget x64: ExileCore/GameOffsets are x64, and the process being read is 64-bit.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Platforms>AnyCPU;x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ExileApi.Tools.FindOffset</RootNamespace>
+    <AssemblyName>FindOffset</AssemblyName>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\Core.csproj" />
+    <ProjectReference Include="..\..\GameOffsets\GameOffsets.csproj" />
+  </ItemGroup>
+
+</Project>

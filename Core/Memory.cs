@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -111,7 +111,18 @@ public class Memory : IMemory
         {
             if (size <= 0 || address.ToInt64() <= 0 /*|| !AddressIsValid(address)*/) return new byte[0];
             var buffer = new byte[size];
-            ProcessMemory.ReadProcessMemoryArray(OpenProcessHandle, address, buffer, 0, size);
+
+            // The return value is CHECKED, not discarded. A failed read leaves the buffer zeroed, and
+            // a zeroed buffer is indistinguishable from a region that legitimately holds zeros — so
+            // dropping the result turns "these offsets no longer match the client" into "the game
+            // says zero", silently. That is the single failure mode this fork is currently digging
+            // itself out of, and it must be audible.
+            //
+            // The buffer is still returned as-is: callers are written against that contract, and
+            // changing it here would be a behaviour change smuggled in under a diagnostic fix. What
+            // changes is only that the failure now leaves a trace.
+            if (!ProcessMemory.ReadProcessMemoryArray(OpenProcessHandle, address, buffer, 0, size))
+                ReportFailedRead(address, size);
 
             return buffer;
         }
@@ -119,6 +130,37 @@ public class Memory : IMemory
         {
             DebugWindow.LogError($"Readmem-> A: {address} Size: {size}. {e}");
             throw;
+        }
+    }
+
+    private static long _lastFailedReadLogTick;
+    private static long _failedReadCount;
+
+    /// <summary>
+    /// Reports a failed raw read, throttled to one line per second. Throttling is not cosmetic: a
+    /// wrong offset produces failures every frame from several threads, and an unthrottled log would
+    /// bury the very information it carries. The running total is printed with each line so the
+    /// scale stays visible.
+    /// </summary>
+    private static void ReportFailedRead(IntPtr address, int size)
+    {
+        var total = System.Threading.Interlocked.Increment(ref _failedReadCount);
+        var now = Environment.TickCount64;
+        var last = System.Threading.Interlocked.Read(ref _lastFailedReadLogTick);
+
+        if (now - last < 1000) return;
+        if (System.Threading.Interlocked.CompareExchange(ref _lastFailedReadLogTick, now, last) != last) return;
+
+        try
+        {
+            DebugWindow.LogError(
+                $"ReadMem failed at 0x{address.ToInt64():X} for {size} bytes (total failures: {total}). " +
+                "The buffer is zeroed, so whatever reads it will see zeros — treat those zeros as " +
+                "\"could not read\", not as game data.");
+        }
+        catch
+        {
+            // Diagnostics must never take down the caller: outside the host there may be no log sink.
         }
     }
 
