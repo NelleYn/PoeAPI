@@ -75,12 +75,43 @@ public class Offsets
     // 3.3.x
     //    48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 3D ?? ?? ?? ?? 48 8B 1F
 
+    // ── Сигнатуры для ТЕКУЩЕГО клиента ──────────────────────────────────────────────────────────
+    //
+    // Прежние сигнатуры были сняты с клиента 2017 года (комментарии рядом с ними упоминали
+    // "3.0.3b" и "alpha 2.5") и на клиенте 2026-09-14 не находятся НИ ОДНА: проверено и сканом
+    // файла клиента, и прогоном tools/SanityRead против живого процесса. Они остались в истории
+    // git — см. коммит, который заменил их на эти.
+    //
+    // Откуда взяты эти. Из эталонного дистрибутива ExileApi-Compiled, который на этом клиенте
+    // работает: его сигнатуры лежат в куче строк #US его сборки, а имена якорей он печатает в свои
+    // логи вместе со смещением найденного совпадения. Сопоставление «сигнатура -> имя» сделано не
+    // на глаз, а по совпадению чисел: сканируем файл клиента, переводим файловое смещение в RVA по
+    // таблице секций PE и сравниваем с тем, что эталон записал в лог за сегодня. Совпало точно:
+    //
+    //   File Root     RVA 0x21CFE80   (лог эталона: 35454592)
+    //   Area change   RVA 0xD59C96    (лог эталона: 13999254)
+    //   Game State    RVA 0xF2611     (лог эталона: 992785)
+    //
+    // Проверка, что сопоставление не случайно: седьмая сигнатура эталона (DiagnosticInfoType) в
+    // файле клиента не находится вовсе — и эталон в своём логе пишет для неё ровно Offset:[0].
+    //
+    // Две правки формата против того, как сигнатура записана у эталона, обе вынужденные:
+    //   * убран ВЕДУЩИЙ "??" — эталон сообщает смещение на байт дальше начала совпадения, и без
+    //     этого RVA расходился бы с логом ровно на 1;
+    //   * убраны ХВОСТОВЫЕ "??" — Memory.FindPatterns сверяет первый и последний байт МИМО маски
+    //     (Core/Memory.cs, CompareData), поэтому паттерн, кончающийся на wildcard, не найдётся
+    //     никогда. Информации хвостовые wildcard не несут, на позицию якоря не влияют.
+    // Каждая из трёх после этих правок даёт в файле клиента РОВНО ОДНО совпадение.
+    //
+    // startOffset снят (был подсказкой поиска от старого клиента и указывал мимо): скан идёт с нуля.
+
+    /// <summary>Signature for the file-root pointer. Anchor (RIP displacement) at +2.</summary>
     private static readonly Pattern fileRootPattern =
         new Pattern(new byte[]
             {
-                0x65, 0x48, 0x8b, 0x04, 0x25, 0x58, 0x00, 0x00, 0x00, 0x48, 0x8b, 0x08, 0x48, 0x8d, 0x35, 0x09, 0x9b, 0x25, 0x01
-            }, "xxxxx????xxxxxx????", "File Root",
-            13930000);
+                0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x8B, 0x00, 0x00, 0x8B, 0x00, 0x00, 0x00, 0x00, 0x8B,
+                0x00, 0x00, 0x00, 0x0F, 0x28, 0x00, 0x00, 0x00, 0x00, 0x83, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC3
+            }, "x??????x??x????x???xx????x??????x", "File Root");
 
     /* Area Change
     00007FF63317CE40 | 48 83 EC 58                    | sub rsp,58                                      |
@@ -100,29 +131,14 @@ public class Offsets
     // 3.0.3b
     //     48 83 EC 58 4C 8B C1 41 B9 01 00 00 00 48 8B 49 10
 
+    /// <summary>Signature for the area-change counter. Anchor (RIP displacement) at +22.</summary>
     private static readonly Pattern areaChangePattern =
         new Pattern(
             new byte[]
             {
-                0x0f, 0xc1, 0x41, 0x44,
-                0x8b, 0x05, 0x16, 0x67, 0x56, 0x01,
-                0x89, 0x41, 0x40,
-                0x44, 0x8b, 0x7c, 0x24, 0x54,
-                0x49, 0x8b, 0x7d, 0x08,
-                0x48, 0x8b, 0xdf,
-                0x48, 0x89, 0x5d, 0x10,
-                0x48, 0x85, 0xff,
-                0x74, 0x1c,
-                0xb8, 0x01, 0x00, 0x00, 0x00,
-                0xf0,
-                0x0f, 0xc1, 0x47, 0x44,
-                0x8b, 0x05, 0xee, 0x66, 0x56, 0x01,
-                0x89, 0x47, 0x40,
-                0x48, 0x8b, 0x5d, 0x10,
-                0x44, 0x8b, 0x7c, 0x24, 0x54,
-                0x48, 0x85, 0xff,
-                0x74, 0x15
-            }, "xx??x?????x???x????x???x??x???x?x??????xxx??x?????x???x???x????x?x?", "Area change", 9430000);
+                0x8B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x8B, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0xE8, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x8B
+            }, "x??????x?x?????x????x??????x", "Area change");
 
     /*
     PathOfExile_x64.exe+853E28 - 48 89 05 E9ABC400     - mov [PathOfExile_x64.exe+149EA18],rax { [00000000] }
@@ -139,12 +155,13 @@ public class Offsets
             new byte[] {0x48, 0x89, 0x05, 0x00, 0x00, 0x00, 0x00, 0x48, 0x8B, 0x00, 0x00, 0x00, 0x48, 0x89, 0x00, 0x48, 0x8B, 0xC6},
             "xxx????xx???xx?xxx", "Loading");
 
+    /// <summary>Signature for the game-state controller. Anchor (RIP displacement) at +11.</summary>
     private static readonly Pattern GameStatePattern = new Pattern(
         new byte[]
         {
-            0x48, 0x83, 0xec, 0x50, 0x48, 0xc7, 0x44, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x89, 0x9c, 0x24, 0x00, 0x00, 0x00, 0x00, 0x48,
-            0x8b, 0xf9, 0x33, 0xed, 0x48, 0x39, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0f, 0x85, 0x00, 0x00, 0x00, 0x00
-        }, "xxxxxxxx?????xxxx????xxxxxxx????xxx????", "Game State", 1240000);
+            0x83, 0x00, 0x00, 0x00, 0x8B, 0x00, 0x33, 0x00, 0x00, 0x39, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x0F, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE8
+        }, "x???x?x??x?????xx?????????x", "Game State");
 
     /*
     PathOfExile_x64.exe+118FD9 - 4C 8B 35 48255B01     - mov r14,[PathOfExile_x64.exe+16CB528] { [C6151734A0] }<<here
@@ -210,12 +227,15 @@ public class Offsets
         //  long InGameState = m.Read<long>(Base + BaseAddress, 0x8, 0xF8, 0x38);
         //  System.Console.WriteLine("InGameState: " + InGameState.ToString("x8"));
 
-        FileRoot = m.Read<int>(baseAddress + array[index] + 15) + array[index] + 19;
+        // Арифметика якоря: смещение RIP-относительного disp32 внутри сигнатуры, затем конец
+        // инструкции (disp + 4). Позиции взяты из того же места, что и сами сигнатуры — из позиции
+        // токена '^' в строке эталона, с поправкой на убранный ведущий "??".
+        FileRoot = m.Read<int>(baseAddress + array[index] + 2) + array[index] + 6;
         index++;
 
         //   System.Console.WriteLine("FileRoot Pointer: " + (FileRoot + m.AddressOfProcess).ToString("x8"));
 
-        AreaChangeCount = m.Read<int>(baseAddress + array[index] + 6) + array[index] + 10;
+        AreaChangeCount = m.Read<int>(baseAddress + array[index] + 22) + array[index] + 26;
         index++;
 
         // System.Console.WriteLine("AreaChangeCount: " + m.ReadInt(AreaChangeCount + m.AddressOfProcess).ToString());
@@ -224,7 +244,7 @@ public class Offsets
         //index++;
         // System.Console.WriteLine("Is Loading Screen Offset:" + (isLoadingScreenOffset + m.AddressOfProcess).ToString("x8"));
 
-        GameStateOffset = m.Read<int>(baseAddress + array[index] + 29) + array[index] + 33;
+        GameStateOffset = m.Read<int>(baseAddress + array[index] + 11) + array[index] + 15;
 
         //  System.Console.WriteLine("Game State Offset:" + (GameStateOffset + m.AddressOfProcess).ToString("x8"));
 
