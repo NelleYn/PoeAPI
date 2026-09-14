@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Interfaces;
 
@@ -10,14 +10,42 @@ namespace ExileCore.PoEMemory;
 /// </summary>
 public class Offsets
 {
+    // Client executable names. GGG dropped the "_x64" suffix at some point, so the historical
+    // names alone no longer match a current install: the live client observed on 2026-09-14 was
+    // "PathOfExile_KG", which matches none of the "_x64" spellings. Both spellings are kept so
+    // that an older client still attaches.
+    //
+    // The current spellings are not guessed: they are the literals carried by the reference
+    // ExileApi-Compiled distribution, which does attach to this install
+    // (PathOfExile / PathOfExileSteam / PathOfExileEGS / Pathofexile_KG).
+    //
+    // NOTE: the Epic client ("PathOfExileEGS") exists but is deliberately NOT mapped here — its
+    // IgsOffset/IgsDelta are unknown, and attaching with the wrong delta reads the wrong memory
+    // silently. Add it only together with a value that has been verified against that client.
+
     /// <summary>Offsets for the standalone (non-Steam) client.</summary>
-    public static Offsets Regular = new Offsets {IgsOffset = 0, IgsDelta = 0, ExeName = "PathOfExile_x64"};
+    public static Offsets Regular = new Offsets
+    {
+        IgsOffset = 0, IgsDelta = 0,
+        ExeNames = new[] {"PathOfExile", "PathOfExile_x64"},
+    };
 
     /// <summary>Offsets for the Korean Garena client.</summary>
-    public static Offsets Korean = new Offsets {IgsOffset = 0, IgsDelta = 0, ExeName = "Pathofexile_x64_KG"};
+    public static Offsets Korean = new Offsets
+    {
+        IgsOffset = 0, IgsDelta = 0,
+        ExeNames = new[] {"PathOfExile_KG", "Pathofexile_KG", "Pathofexile_x64_KG"},
+    };
 
     /// <summary>Offsets for the Steam client.</summary>
-    public static Offsets Steam = new Offsets {IgsOffset = 0x28, IgsDelta = 0, ExeName = "PathOfExile_x64Steam"};
+    public static Offsets Steam = new Offsets
+    {
+        IgsOffset = 0x28, IgsDelta = 0,
+        ExeNames = new[] {"PathOfExileSteam", "PathOfExile_x64Steam"},
+    };
+
+    /// <summary>Every client variant the loader knows how to attach to.</summary>
+    public static readonly Offsets[] All = {Regular, Korean, Steam};
     /*
     00007FF7006C7891  | 90                                 | nop                                        |
     00007FF7006C7892  | 48 8B 1D EF 93 06 01               | mov rbx,qword ptr ds:[7FF701730C88]        |
@@ -131,7 +159,14 @@ public class Offsets
     public long Base { get; private set; }
 
     /// <summary>Gets the executable name this offset set targets.</summary>
-    public string ExeName { get; private set; }
+    /// <summary>
+    /// Process names this variant may appear under, newest spelling first. Kept as a LIST because
+    /// the executable has been renamed across client versions and both spellings are in the wild.
+    /// </summary>
+    public string[] ExeNames { get; private set; } = System.Array.Empty<string>();
+
+    /// <summary>First known process name. Kept for callers that expect a single name.</summary>
+    public string ExeName => ExeNames.Length > 0 ? ExeNames[0] : "";
 
     /// <summary>Gets the resolved offset of the game's file-root pointer.</summary>
     public long FileRoot { get; private set; }

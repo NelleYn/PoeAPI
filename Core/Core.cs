@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -528,10 +528,17 @@ public class Core : IDisposable
 
     private static (Process process, Offsets offsets)? FindPoeProcess()
     {
-        var clients = Process.GetProcessesByName(Offsets.Regular.ExeName).Select(x => (x, Offsets.Regular))
-            .ToList();
+        // Every variant, and every known spelling of each: the Steam variant used to be declared
+        // but never searched, and the historical "_x64" spellings stopped matching current clients.
+        var clients = new List<(Process, Offsets)>();
 
-        clients.AddRange(Process.GetProcessesByName(Offsets.Korean.ExeName).Select(p => (p, Offsets.Korean)));
+        foreach (var offsets in Offsets.All)
+        foreach (var exeName in offsets.ExeNames)
+            clients.AddRange(Process.GetProcessesByName(exeName).Select(p => (p, offsets)));
+
+        // The same client can match two spellings only if Windows reports it twice; guard anyway,
+        // because offering the user a "choose one of two" dialog for one process is a bug, not a choice.
+        clients = clients.GroupBy(c => c.Item1.Id).Select(g => g.First()).ToList();
         var ixChosen = clients.Count > 1 ? ChooseSingleProcess(clients) : 0;
 
         if (clients.Count > 0)
