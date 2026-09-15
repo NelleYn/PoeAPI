@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using ExileCore.Shared.Cache;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
@@ -36,7 +36,14 @@ namespace ExileCore.PoEMemory.MemoryObjects
                 () => GetObject<Camera>(Address + /*0x1258*/Extensions.GetOffset<IngameStateOffsets>(nameof(IngameStateOffsets.Camera))));
 
             _ingameData = new AreaCache<IngameData>(() => GetObject<IngameData>(_ingameState.Value.Data));
-            _serverData = new AreaCache<ServerData>(() => GetObject<ServerData>(_ingameState.Value.ServerData));
+            // ServerData is NOT a field of IngameState on this client. Measured: the true address
+            // the reference distribution reports for it does not occur ANYWHERE in the first 0x2000
+            // bytes of IngameState, while it sits at IngameData + 0x968 as the only match in the
+            // window, in three different zones. So it is reached through Data, exactly as the
+            // reference reaches it; IngameStateOffsets.ServerData is an older build's number and is
+            // no longer read. This is also why InGame used to report false while the game state
+            // controller said we were in game: the flag was being read out of an unrelated address.
+            _serverData = new AreaCache<ServerData>(() => GetObject<ServerData>(Data?.DataStruct.ServerData ?? 0));
             _ingameUi = new AreaCache<IngameUIElements>(() => GetObject<IngameUIElements>(_ingameState.Value.IngameUi));
             _UIRoot = new AreaCache<Element>(() => GetObject<Element>(_ingameState.Value.UIRoot));
             _UIHover = new FrameCache<Element>(() => GetObject<Element>(_ingameState.Value.UIHover));

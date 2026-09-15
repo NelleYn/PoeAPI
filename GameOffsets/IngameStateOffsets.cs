@@ -10,6 +10,10 @@ namespace GameOffsets
         // 0x218 is the only match in a 0x2000 window, and the object it points at carries this
         // zone's level and hash. Neighbouring fields below are still from the old build.
         [FieldOffset(0x218)] public long Data;
+        // NOT a field of IngameState on this client, and not read by anything: the true address
+        // of ServerData does not occur anywhere in the first 0x2000 bytes of this object. It lives
+        // inside IngameData instead (IngameDataOffsets.ServerData, measured at 0x968). Kept only so
+        // that the shape of the struct stays comparable with the reference's.
         [FieldOffset(0x378)] public long ServerData;
         [FieldOffset(0x78)] public long IngameUi;
         [FieldOffset(0x4A0)] public long UIRoot;
