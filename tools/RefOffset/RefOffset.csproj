@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RefOffset — «какое поле сырой структуры читает ЭТАЛОННЫЙ форк и по какому смещению».
+
+    Мотив. Оффсеты этого форка от старой сборки игры, а эталон (ExileApi-Compiled) текущего
+    клиента читает правильно. Обычный путь — спросить у эталона адрес живьём и вычесть; он
+    требует запущенной игры, запущенного оверлея и ручного клика в меню плагина. Но эталонная
+    сборка ОБФУСЦИРОВАНА НЕ ПОЛНОСТЬЮ: публичные имена ExileCore целы, а лямбды конструктора
+    сохранили имена вида b__13_2 и, главное, ВОЗВРАЩАЕМЫЕ ТИПЫ. Значит соответствие
+    «свойство IngameState.Data → поле структуры» лежит прямо в IL, а числовое смещение — в
+    раскладке структуры. Оба факта снимаются с файлов, без игры и без угадывания.
+
+    Читает IL и раскладку типов. Сборки эталона ЗАГРУЖАЮТСЯ (Assembly.LoadFrom), но ни один
+    их метод не вызывается: GetMethodBody/ResolveField/ResolveMethod не запускают ни кода
+    форка, ни статических конструкторов. В память игры инструмент не лезет вовсе.
+
+    Запуск:
+      Запуск и режимы — в шапке Program.cs (в XML-комментарий командная строка
+      с ключами не помещается: два дефиса подряд там запрещены).
+
+    Проект standalone, в ExileApi.sln не входит.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AssemblyName>RefOffset</AssemblyName>
+    <RootNamespace>PoeAPI.Tools.RefOffset</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+</Project>
