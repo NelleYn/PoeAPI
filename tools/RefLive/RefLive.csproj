@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RefLive — дифференциальный оракул без оверлея.
+
+    Задача. Оффсеты этого форка от старой сборки игры; эталонный ExileApi-Compiled читает того же
+    клиента правильно. Значит истинный адрес не ищут, а спрашивают у эталона. Штатный способ
+    спросить — запустить оверлей и нажать кнопку в меню плагина: он требует игры на переднем плане,
+    ручного клика и не повторяется после перезапуска игры без второго такого же клика.
+
+    Здесь у эталона спрашивают напрямую: его ExileCore подключается как обычная библиотека,
+    конструируются Memory и TheGame, и печатаются АДРЕСА подобъектов. Оверлея, DirectX, ImGui,
+    плагинов и корутин нет — консольное приложение отрабатывает и выходит, поэтому замер
+    повторяется одной командой сколько угодно раз.
+
+    Почему это вообще работает, хотя статический реверс закрыт: тела методов эталона подменены
+    (см. tools/RefOffset), но защита восстанавливает их В РАНТАЙМЕ. Файл прочитать нельзя, а
+    выполнить — можно.
+
+    ТОЛЬКО ЧТЕНИЕ. Memory эталона открывает процесс на чтение; записи в чужую память, ввода и
+    внедрения здесь нет. Но код эталона тут ИСПОЛНЯЕТСЯ — этим инструмент отличается от
+    ForkProbe и RefOffset, которые читают только метаданные.
+
+    Ссылки — на DLL эталона, а не ProjectReference: свой Core здесь не при чём, спрашиваем именно
+    чужие числа. Путь задаётся свойством RefDir и переопределяется ключом
+    -p:RefDir="путь\к\эталону".
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Platforms>AnyCPU;x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ExileApi.Tools.RefLive</RootNamespace>
+    <AssemblyName>RefLive</AssemblyName>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RefDir)' == ''">
+    <RefDir>C:\Users\ReviPc\Desktop\ExileApi-Compiled</RefDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="ExileCore">
+      <HintPath>$(RefDir)\ExileCore.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GameOffsets">
+      <HintPath>$(RefDir)\GameOffsets.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Путь эталона нужен и в рантайме: оттуда догружаются зависимости его ExileCore. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RefDir</_Parameter1>
+      <_Parameter2>$(RefDir)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

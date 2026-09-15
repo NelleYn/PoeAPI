@@ -7,8 +7,9 @@ using System.Runtime.Loader;
 // RefOffset — что можно узнать об ЭТАЛОННОМ форке по его файлам, без запуска игры.
 //
 // Режимы:
-//   --layout <Тип>   раскладка структуры: смещение (у CLR, не «по порядку полей»), размер, тип
-//   --trace  <Тип>   IL всех методов типа: чтения полей, литералы, вызовы — и ВЕРДИКТ по телу
+//   --layout <Тип>       раскладка структуры: смещение (у CLR, не «по порядку полей»), размер, тип
+//   --trace  <Тип>       IL всех методов типа: чтения полей, литералы, вызовы — и ВЕРДИКТ по телу
+//   --structs <подстрока> все структуры GameOffsets: раскладка и размер, по убыванию размера
 //
 // Зачем был написан. Оффсеты этого форка от старой сборки игры; эталон читает текущего клиента
 // правильно. Хотелось снять соответствие «свойство IngameState.Data → поле структуры → смещение»
@@ -52,6 +53,7 @@ if (!Directory.Exists(root))
 
 string mode = args.Length > 1 ? args[1] : "--trace";
 string want = args.Length > 2 ? args[2] : "IngameState";
+if (mode == "--structs") want = "IngameState"; // тип для --structs не нужен: он перебирает все
 
 var ctx = new DirLoadContext(root);
 var assemblies = new List<Assembly>();
@@ -75,6 +77,7 @@ if (target == null)
 
 switch (mode)
 {
+    case "--structs": Tracer.PrintStructs(assemblies, args.Length > 2 ? args[2] : ""); return 0;
     case "--layout": Tracer.PrintLayout(target); return 0;
     case "--trace": Tracer.PrintTrace(target); return 0;
     default:
@@ -99,6 +102,41 @@ static class Tracer
         foreach (var t in all) if (t.Name == want) return t;
         foreach (var t in all) if (t.FullName != null && t.FullName.Contains(want, StringComparison.OrdinalIgnoreCase)) return t;
         return null;
+    }
+
+    // ── перечень структур ───────────────────────────────────────────────────────────────────────
+    // Обфускация переименовала ЧАСТЬ типов GameOffsets (t83743 и подобные), поэтому искать нужную
+    // раскладку по имени бесполезно. Размер и вид раскладки имена переживают: по ним структура
+    // опознаётся независимо от того, как её назвали.
+    public static void PrintStructs(List<Assembly> assemblies, string filter)
+    {
+        var rows = new List<(int Size, string Name, string Kind, int Fields)>();
+        foreach (var a in assemblies)
+        {
+            Type[] types;
+            try { types = a.GetTypes(); }
+            catch (ReflectionTypeLoadException ex) { types = Array.FindAll(ex.Types, t => t != null); }
+
+            foreach (var t in types)
+            {
+                if (!t.IsValueType || t.IsEnum || t.IsGenericType) continue;
+                if (filter.Length > 0 && (t.FullName == null || !t.FullName.Contains(filter, StringComparison.OrdinalIgnoreCase))) continue;
+
+                int size;
+                try { size = Marshal.SizeOf(t); }
+                catch { continue; } // размер не вычислим — структура не блоб памяти, тут не о ней речь
+
+                string kind = t.StructLayoutAttribute?.Value.ToString() ?? "?";
+                int fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Length;
+                rows.Add((size, t.FullName, kind, fields));
+            }
+        }
+
+        rows.Sort((x, y) => y.Size.CompareTo(x.Size));
+        Console.WriteLine($"### структур: {rows.Count}   (фильтр: {(filter.Length > 0 ? filter : "нет")})");
+        Console.WriteLine();
+        foreach (var r in rows)
+            Console.WriteLine($"  0x{r.Size:X6}  {r.Size,9:N0} б  {r.Kind,-10} полей={r.Fields,-4} {r.Name}");
     }
 
     // ── раскладка структуры ─────────────────────────────────────────────────────────────────────
@@ -148,6 +186,12 @@ static class Tracer
         methods.AddRange(t.GetMethods(flags));
         methods.AddRange(t.GetConstructors(flags));
 
+        // Сигнатуры конструкторов печатаются отдельно и ДО разбора тел: у конструктора тело может
+        // отсутствовать вовсе, а знать, чем тип создаётся, нужно раньше, чем чем он занят внутри.
+        foreach (var c in t.GetConstructors(flags))
+            Console.WriteLine($"  .ctor({string.Join(", ", Array.ConvertAll(c.GetParameters(), x => $"{Short(x.ParameterType)} {x.Name}"))})");
+        Console.WriteLine();
+
         int withBody = 0, broken = 0;
 
         foreach (var m in methods)
@@ -171,7 +215,8 @@ static class Tracer
             if (verdict != null) broken++;
 
             string ret = m is MethodInfo mi ? Short(mi.ReturnType) : "void";
-            Console.WriteLine($"  {m.Name} () : {ret}   [{il.Length} б IL]{(verdict != null ? "   ← ТЕЛО ПОДМЕНЕНО" : "")}");
+            string ps = string.Join(", ", Array.ConvertAll(m.GetParameters(), x => $"{Short(x.ParameterType)} {x.Name}"));
+            Console.WriteLine($"  {m.Name}({ps}) : {ret}   [{il.Length} б IL]{(verdict != null ? "   ← ТЕЛО ПОДМЕНЕНО" : "")}");
             if (verdict != null) Console.WriteLine($"      {verdict}");
             foreach (var line in lines) Console.WriteLine($"      {line}");
             Console.WriteLine();

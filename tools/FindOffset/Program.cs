@@ -82,6 +82,13 @@ internal static class Program
     /// <summary>Qwords printed behind each followed pointer.</summary>
     private const int MaxChainQwords = 6;
 
+    /// <summary>
+    /// Bytes examined inside each candidate by "--at any". A back-pointer to the owner sits in the
+    /// head of the object; scanning further turns a targeted check into a memory sweep, and the
+    /// price of an unbounded sweep in this project is on record (see MaxHashMapNodes).
+    /// </summary>
+    private const int MaxBackrefScanBytes = 0x400;
+
     /// <summary>"What is behind this pointer" probes issued while describing a window.</summary>
     private const int MaxProbes = 4096;
 
@@ -124,6 +131,7 @@ internal static class Program
         Find,
         Window,
         Chain,
+        Backref,
         IngameStateOnly
     }
 
@@ -191,6 +199,7 @@ internal static class Program
         string inText = null;
         string lenText = null;
         string valueText = null;
+        string atText = null;
         var valueSize = 8;
         var useIngameState = false;
 
@@ -216,6 +225,20 @@ internal static class Program
 
                 case "--chain":
                     mode = Mode.Chain;
+                    break;
+
+                case "--backref":
+                    mode = Mode.Backref;
+                    break;
+
+                case "--at":
+                    if (++i >= args.Length)
+                    {
+                        Console.WriteLine("ОШИБКА: у --at нет значения.");
+                        return ExitNothingToRead;
+                    }
+
+                    atText = args[i];
                     break;
 
                 case "--ingame-state":
@@ -318,23 +341,57 @@ internal static class Program
 
         long value = 0;
 
-        if (mode == Mode.Find)
+        // The window base as a --value. Addresses change on every game restart, so a mode whose
+        // whole point is repeating the measurement after a restart must not require the address to
+        // be retyped: "self" keeps the command line valid across runs.
+        var valueIsSelf = valueText != null && valueText.Equals("self", StringComparison.OrdinalIgnoreCase);
+
+        if (mode == Mode.Find || mode == Mode.Backref)
         {
             if (valueText == null)
             {
-                Console.WriteLine("ОШИБКА: режим --find требует --value <значение>.");
+                Console.WriteLine($"ОШИБКА: режим {(mode == Mode.Find ? "--find" : "--backref")} требует --value <значение> (для --backref годится и \"self\").");
                 return ExitNothingToRead;
             }
 
-            if (!TryParseHex(valueText, out value, out var valError))
+            if (!valueIsSelf && !TryParseHex(valueText, out value, out var valError))
             {
                 Console.WriteLine($"ОШИБКА: --value {valueText} — {valError}");
                 return ExitNothingToRead;
             }
 
-            if (valueSize == 4 && (ulong) value > uint.MaxValue)
+            if (!valueIsSelf && valueSize == 4 && (ulong) value > uint.MaxValue)
             {
                 Console.WriteLine($"ОШИБКА: --value {HexU(value)} не помещается в 4 байта, а задан --size 4.");
+                return ExitNothingToRead;
+            }
+        }
+
+        long at = 0;
+        var atAny = false;
+
+        if (mode == Mode.Backref)
+        {
+            if (atText == null)
+            {
+                Console.WriteLine("ОШИБКА: режим --backref требует --at <смещение обратного указателя>.");
+                return ExitNothingToRead;
+            }
+
+            // "any" is the honest default when no foreign layout says where the back-pointer sits:
+            // the head of each candidate is scanned and every hit is reported WITH its offset, so
+            // the answer is measured rather than assumed.
+            atAny = atText.Equals("any", StringComparison.OrdinalIgnoreCase);
+
+            if (!atAny && !TryParseHex(atText, out at, out var atError))
+            {
+                Console.WriteLine($"ОШИБКА: --at {atText} — {atError}");
+                return ExitNothingToRead;
+            }
+
+            if (!atAny && (at < 0 || at > MaxWindowBytes))
+            {
+                Console.WriteLine($"ОШИБКА: --at {HexU(at)} вне разумного диапазона 0..{Hex(MaxWindowBytes)}.");
                 return ExitNothingToRead;
             }
         }
@@ -492,6 +549,9 @@ internal static class Program
 
             case Mode.Chain:
                 return DoChain(start, window, pageOk, length);
+
+            case Mode.Backref:
+                return DoBackref(start, window, pageOk, length, valueIsSelf ? start : value, at, atAny, valueIsSelf);
 
             default:
                 Console.WriteLine("ОШИБКА: режим не выбран.");
@@ -702,6 +762,128 @@ internal static class Program
             Console.WriteLine($"  ПРЕДЕЛ: исчерпаны {MaxProbes} проб «что лежит по указателю» — часть пометок короче обычного.");
 
         return followed > 0 ? ExitFound : ExitNotFound;
+    }
+
+    // ── Mode 4: --backref ────────────────────────────────────────────────────────────────────────
+    //
+    // "Which pointer in this window leads to an object that points BACK at us."
+    //
+    // Why this is a separate mode and not a variant of --find. --find needs the true address to be
+    // known already, and the only way to learn it was to run a second, correct fork against the same
+    // process at the same moment. A back-pointer removes that dependency: the candidate proves
+    // itself, because the value being matched is the base of OUR window and a random qword cannot
+    // equal it by accident. A foreign layout is then used only to say WHERE inside the candidate the
+    // back-pointer should sit (--at); the verdict still comes from this client's memory.
+    //
+    // Bounded exactly like --chain: at most MaxChainTargets pointers followed, one 8-byte read
+    // behind each, every limit announced. Read only.
+    private static int DoBackref(long start, byte[] window, bool[] pageOk, int length, long value, long at, bool atAny, bool valueIsSelf)
+    {
+        Head(atAny
+            ? $"ОБРАТНЫЙ УКАЗАТЕЛЬ: у какого указателя окна в первых {Hex(MaxBackrefScanBytes)} б лежит {HexU(value)}"
+            : $"ОБРАТНЫЙ УКАЗАТЕЛЬ: у какого указателя окна по +{Hex(at)} лежит {HexU(value)}");
+
+        if (valueIsSelf)
+            Console.WriteLine($"  --value self: ищем указатель НА НАЧАЛО ОКНА {HexU(value)}.");
+
+        Console.WriteLine();
+
+        var followed = 0;
+        var probed = 0;
+        var limitHit = false;
+        var matches = new List<long[]>();
+
+        for (var off = 0; off + 8 <= length; off += 8)
+        {
+            if (!PageRangeOk(pageOk, off, 8))
+                continue;
+
+            var qword = BitConverter.ToInt64(window, off);
+
+            if (!IsPointer(qword))
+                continue;
+
+            if (followed >= MaxChainTargets)
+            {
+                limitHit = true;
+                break;
+            }
+
+            followed++;
+
+            var probe = atAny ? qword : qword + at;
+            var probeLen = atAny ? MaxBackrefScanBytes : 8;
+
+            if (!IsPointer(probe))
+                continue;
+
+            var region = QueryRegion(probe);
+
+            if (region == null || !region.Readable)
+                continue;
+
+            var bytes = ReadBytesSafe(probe, probeLen, out _);
+
+            if (bytes == null)
+                continue;
+
+            probed++;
+
+            var head = ReadBytesSafe(qword, 8, out _);
+            var vtable = head == null ? 0L : BitConverter.ToInt64(head, 0);
+
+            // Byte granular on purpose, same reason as --find: an unaligned hit is rare but real,
+            // and rounding it away would be the silent "fixing" this tool must never do.
+            for (var k = 0; k + 8 <= bytes.Length; k++)
+            {
+                if (BitConverter.ToInt64(bytes, k) != value)
+                    continue;
+
+                matches.Add(new[] {off, qword, vtable, atAny ? k : at});
+
+                if (!atAny)
+                    break;
+            }
+        }
+
+        if (matches.Count == 0)
+        {
+            Console.WriteLine($"  НЕ НАЙДЕНО: ни один указатель окна не ведёт к объекту, у которого {(atAny ? $"в первых {Hex(MaxBackrefScanBytes)} б" : $"по +{Hex(at)}")} лежит {HexU(value)}.");
+            Console.WriteLine($"  Прочитано {probed} кандидатов из {followed} указателей окна.");
+            Console.WriteLine("  Это тоже ответ: либо обратного указателя по этому смещению нет (чужая раскладка");
+            Console.WriteLine("  не подошла), либо поле лежит за пределами окна — увеличьте --len или смените --at.");
+            return ExitNotFound;
+        }
+
+        Console.WriteLine($"  совпадений: {matches.Count}   (проверено {probed} кандидатов из {followed} указателей окна)");
+        Console.WriteLine();
+        Console.WriteLine("  смещение      адрес объекта        обратный ук. внутри   первый qword объекта");
+        Console.WriteLine("  " + new string('-', 92));
+
+        foreach (var m in matches)
+        {
+            var vtableModule = FindModule(m[2]);
+            var vtableText = vtableModule != null && vtableModule.IsGame
+                ? $"0x{m[2]:X16} -> {vtableModule.Name}+{Hex(m[2] - vtableModule.Base)}"
+                : $"0x{m[2]:X16} [vtable в модуле игры НЕ обнаружена]";
+
+            Console.WriteLine($"  +{Hex(m[0]),-12} 0x{m[1]:X16}   +{Hex(m[3]),-18} {vtableText}");
+        }
+
+        Console.WriteLine();
+
+        if (limitHit)
+            Console.WriteLine($"  ПРЕДЕЛ: пройдено {MaxChainTargets} указателей — остальные в окне НЕ проверены (сузьте --len).");
+
+        // Several matches are an answer too, and a worse one: it means the back-pointer does not
+        // single the field out. Saying so is the difference between a measurement and a guess.
+        if (matches.Count > 1)
+            Console.WriteLine("  ВНИМАНИЕ: совпадений больше одного — смещение этим признаком НЕ определяется однозначно.");
+
+        if (_probeLimitAnnounced)
+            Console.WriteLine($"  ПРЕДЕЛ: исчерпаны {MaxProbes} проб «что лежит по указателю».");
+
+        return ExitFound;
     }
 
     // ── Convenience: resolving IngameState ───────────────────────────────────────────────────────
