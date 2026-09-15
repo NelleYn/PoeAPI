@@ -552,22 +552,39 @@ internal static class Program
         {
             var t = terrain.Value;
 
-            // Ширина сетки — BytesPerRow*2: байт пакует ДВЕ ячейки по 4 бита (так это декодирует
-            // плагин MovementHelperPoe, Terrain/TerrainGrid.cs). NumRows — высота в ячейках.
-            gridWidth = t.BytesPerRow * 2;
-            gridHeight = t.NumRows;
+            // NumCols/NumRows считают ТАЙЛЫ, а не клетки: сторона тайла — 23 клетки. Ширина сетки в
+            // клетках — BytesPerRow*2 (байт пакует ДВЕ 4-битные клетки), высота — размер мели-слоя,
+            // делённый на шаг строки; так её выводит и плагин (Terrain/TerrainGrid.cs), и эталон.
+            // Брать NumRows за высоту НЕЛЬЗЯ, и это ровно ловушка «ok не значит верно»: на замеренной
+            // зоне вышло бы 81 вместо 1863, и 81 выглядит совершенно правдоподобной высотой.
+            var meleeBytes = t.LayerMelee.Last - t.LayerMelee.First;
+            var strideOk = t.BytesPerRow >= 1 && t.BytesPerRow <= 4000;
 
-            Row("terrain NumCols", t.NumCols.ToString(CultureInfo.InvariantCulture), "1..4000",
-                t.NumCols >= 1 && t.NumCols <= 4000 ? Verdict.Ok : Verdict.Bad);
+            gridWidth = strideOk ? t.BytesPerRow * 2 : 0;
+            gridHeight = strideOk && meleeBytes > 0 && meleeBytes / t.BytesPerRow <= int.MaxValue
+                ? (int) (meleeBytes / t.BytesPerRow)
+                : 0;
 
-            Row("terrain NumRows", t.NumRows.ToString(CultureInfo.InvariantCulture), "1..4000",
-                t.NumRows >= 1 && t.NumRows <= 4000 ? Verdict.Ok : Verdict.Bad);
+            Row("terrain NumCols (тайлы)", t.NumCols.ToString(CultureInfo.InvariantCulture), "1..1000",
+                t.NumCols >= 1 && t.NumCols <= 1000 ? Verdict.Ok : Verdict.Bad);
+
+            Row("terrain NumRows (тайлы)", t.NumRows.ToString(CultureInfo.InvariantCulture), "1..1000",
+                t.NumRows >= 1 && t.NumRows <= 1000 ? Verdict.Ok : Verdict.Bad);
 
             Row("terrain BytesPerRow", t.BytesPerRow.ToString(CultureInfo.InvariantCulture), "1..4000",
-                t.BytesPerRow >= 1 && t.BytesPerRow <= 4000 ? Verdict.Ok : Verdict.Bad);
+                strideOk ? Verdict.Ok : Verdict.Bad);
+
+            Row("мели-слой, байт", meleeBytes.ToString(CultureInfo.InvariantCulture),
+                "кратен BytesPerRow",
+                strideOk && meleeBytes > 0 && meleeBytes % t.BytesPerRow == 0 ? Verdict.Ok : Verdict.Bad);
 
             Row("сетка (ширина x высота)", $"{gridWidth} x {gridHeight}", "обе стороны 1..8000",
                 gridWidth >= 1 && gridWidth <= 8000 && gridHeight >= 1 && gridHeight <= 8000 ? Verdict.Ok : Verdict.Bad);
+
+            // Независимая сверка: высота, посчитанная по слою, обязана совпасть с высотой, посчитанной
+            // по тайлам. Два разных поля структуры сходятся только если ОБА прочитаны верно.
+            Row("высота = NumRows * 23", $"{gridHeight} против {t.NumRows * 23}", "числа совпадают",
+                gridHeight > 0 && gridHeight == t.NumRows * 23 ? Verdict.Ok : Verdict.Bad);
         }
 
         // ── Шаг 5. Игрок ─────────────────────────────────────────────────────────────────────────

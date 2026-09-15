@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -150,11 +151,204 @@ namespace ExileApi.Tools.RefLive
             Safe("хэш зоны", () => "0x" + data.CurrentAreaHash.ToString("X"));
             Safe("список сущностей", () => data.EntityList == null ? "(null)" : "есть");
 
+            // ── Адреса подобъектов IngameData ────────────────────────────────────────────────
+            // Это вход в следующий слой. Каждое напечатанное число FindOffset ищет внутри окна,
+            // начинающегося с data.Address, и отвечает смещением. Числа принадлежат ЭТОМУ запуску
+            // игры: после перезапуска они будут другими, а смещение обязано остаться тем же.
+            Console.WriteLine();
+            Console.WriteLine($"АДРЕСА ВНУТРИ IngameData  (окно: --in 0x{data.Address:X})");
+            Console.WriteLine(new string('-', 100));
+
+            foreach (var member in SubObjectMembers)
+                ReportMemberAddress(data, member);
+
+            // ── Значения внутри IngameData ───────────────────────────────────────────────────────
+            // Поле опознаётся не только указателем: уровень зоны и хэш — числа из другого источника,
+            // и единственное совпадение такого числа в окне подтверждает поле содержимым, а не
+            // раскладкой. Это самое сильное подтверждение, доступное без отладчика.
+            Console.WriteLine();
+            Console.WriteLine("ЗНАЧЕНИЯ ВНУТРИ IngameData  (искать как --find --size 4|8)");
+            Console.WriteLine(new string('-', 100));
+
+            foreach (var member in ValueMembers)
+                ReportMemberValue(data, member);
+
+            DumpStructMember(data, "Terrain");
+
+            // MapStats измерим ТОЛЬКО в карте: вне карты эталон отдаёт пустой набор, и искать в окне
+            // нечего. Печатается количество и пары: по ним опознаётся нативный массив, на который
+            // указывает поле, — само поле находится как тройка First/Last/End нужного размера.
+            DumpDictionaryMember(data, "MapStats");
+            DumpDictionaryMember(data, "MapStatsVisible");
+
             Console.WriteLine();
             Console.WriteLine("ДАЛЬШЕ: смещение внутри IngameState считает FindOffset —");
             Console.WriteLine($"  FindOffset.exe --find --ingame-state --len 0x2000 --value 0x{data.Address:X}");
 
             return ExitOk;
+        }
+
+        // Члены эталонного IngameData, чей АДРЕС нужен для восстановления смещения. Список — это
+        // имена, а не числа: имена между форками совпадают, числа нет (docs/api/parity-measured.md).
+        private static readonly string[] SubObjectMembers =
+        {
+            "LocalPlayer", "EntityList", "SleepingEntityList", "ServerData",
+            "CurrentArea", "EnvironmentData", "LabyrinthData"
+        };
+
+        // Члены, чьё ЗНАЧЕНИЕ пришло из эталона и потому годится как независимая примета поля.
+        private static readonly string[] ValueMembers =
+        {
+            "CurrentAreaLevel", "CurrentAreaHash", "EntitiesCount", "SleepingEntityCount",
+            "AreaDimensions"
+        };
+
+        // Читает член эталона ПО ИМЕНИ. Свойство может бросить (объекта нет, страница не читается);
+        // это ответ «пусто», а не отказ инструмента — печатается строкой, работа продолжается.
+        private static object Member(object owner, string name, out string error)
+        {
+            error = null;
+
+            const BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic |
+                                       BindingFlags.Instance | BindingFlags.FlattenHierarchy;
+
+            var type = owner.GetType();
+
+            try
+            {
+                var prop = type.GetProperty(name, Flags);
+                if (prop != null) return prop.GetValue(owner);
+
+                var field = type.GetField(name, Flags);
+                if (field != null) return field.GetValue(owner);
+            }
+            catch (Exception e)
+            {
+                error = DescribeException(e);
+                return null;
+            }
+
+            error = "нет такого члена у эталона";
+            return null;
+        }
+
+        private static void ReportMemberAddress(object owner, string name)
+        {
+            var value = Member(owner, name, out var error);
+
+            if (error != null)
+            {
+                Console.WriteLine($"  Data.{name,-22} {error}");
+                return;
+            }
+
+            if (value == null)
+            {
+                Console.WriteLine($"  Data.{name,-22} 0x0   [пусто]");
+                return;
+            }
+
+            var address = Member(value, "Address", out var inner);
+
+            if (address is long a)
+                Report("Data." + name, a);
+            else
+                Console.WriteLine($"  Data.{name,-22} {inner ?? "нет члена Address у " + value.GetType().Name}");
+        }
+
+        private static void ReportMemberValue(object owner, string name)
+        {
+            var value = Member(owner, name, out var error);
+            Console.WriteLine($"  Data.{name,-22} {error ?? Describe(value)}");
+        }
+
+        // Структура печатается по полям: подтверждать её придётся по одному полю, а не целиком.
+        private static void DumpStructMember(object owner, string name)
+        {
+            var value = Member(owner, name, out var error);
+
+            if (error != null || value == null)
+            {
+                Console.WriteLine($"  Data.{name,-22} {error ?? "(null)"}");
+                return;
+            }
+
+            Console.WriteLine($"  Data.{name,-22} {value.GetType().Name}:");
+
+            foreach (var field in value.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
+            {
+                object inner;
+
+                try { inner = field.GetValue(value); }
+                catch (Exception e) { inner = e; }
+
+                Console.WriteLine($"      .{field.Name,-18} {Describe(inner)}");
+            }
+        }
+
+        // Словарь эталона печатается парами «ключ=значение» в СЫРОМ виде: в памяти пара лежит как
+        // два int подряд, и именно этим числом (value<<32 | key) пара опознаётся в дампе.
+        private static void DumpDictionaryMember(object owner, string name)
+        {
+            var value = Member(owner, name, out var error);
+
+            if (error != null || value == null)
+            {
+                Console.WriteLine($"  Data.{name,-22} {error ?? "(null)"}");
+                return;
+            }
+
+            var dict = value as System.Collections.IDictionary;
+
+            if (dict == null)
+            {
+                Console.WriteLine($"  Data.{name,-22} не словарь: {value.GetType().Name}");
+                return;
+            }
+
+            Console.WriteLine($"  Data.{name,-22} пар: {dict.Count}  (байт в массиве: {dict.Count * 8})");
+
+            var shown = 0;
+
+            foreach (System.Collections.DictionaryEntry e in dict)
+            {
+                if (shown++ >= 8) break;
+
+                var key = Convert.ToInt64(Convert.ToInt32(e.Key));
+                var val = Convert.ToInt64(Convert.ToInt32(e.Value));
+
+                Console.WriteLine($"      {e.Key,-34} = {e.Value,-8} сырая пара 0x{(val << 32 | (key & 0xFFFFFFFFL)):X16}");
+            }
+        }
+
+        // Числа печатаются и десятично, и шестнадцатерично: --find принимает HEX, а глазом поле
+        // опознаётся десятичным (уровень зоны — 67, а не 0x43).
+        private static string Describe(object value)
+        {
+            switch (value)
+            {
+                case null:      return "(null)";
+                case Exception e: return DescribeException(e);
+                case long l:    return l == 0 ? "0" : $"{l} (0x{l:X})";
+                case ulong ul:  return ul == 0 ? "0" : $"{ul} (0x{ul:X})";
+                case int i:     return i == 0 ? "0" : $"{i} (0x{i:X})";
+                case uint u:    return u == 0 ? "0" : $"{u} (0x{u:X})";
+                case short s:   return $"{s} (0x{s:X})";
+                case ushort us: return $"{us} (0x{us:X})";
+                case byte b:    return $"{b} (0x{b:X})";
+                case float f:   return f.ToString("R", CultureInfo.InvariantCulture);
+                case double d:  return d.ToString("R", CultureInfo.InvariantCulture);
+                default:        return value.ToString();
+            }
+        }
+
+        // Рефлексия заворачивает исключение свойства в TargetInvocationException; интересна причина.
+        private static string DescribeException(Exception e)
+        {
+            while (e is TargetInvocationException && e.InnerException != null)
+                e = e.InnerException;
+
+            return $"НЕ ПРОЧИТАНО: {e.GetType().Name}: {Oneline(e.Message)}";
         }
 
         // Создаёт объект чужой сборки конструктором с нужным числом аргументов, независимо от его

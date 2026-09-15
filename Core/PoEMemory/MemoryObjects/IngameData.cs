@@ -55,7 +55,11 @@ namespace ExileCore.PoEMemory.MemoryObjects
                 var value = 0;
                 var total_stats = (int) (statPtrEnd - statPtrStart);
 
-                if (total_stats / 8 > 200)
+                // A stat array is whole 8-byte (key, value) pairs and nothing else. Anything that is
+                // not — negative, ragged, or absurdly long — means the pointers are stale or the
+                // offset is wrong, and the only safe answer is to read nothing: ReadMem takes the
+                // length on trust, and this project has already paid for an unbounded read once.
+                if (total_stats < 0 || total_stats % 8 != 0 || total_stats / 8 > 200)
                     return null;
 
                 var bytes = M.ReadMem(statPtrStart, total_stats);
