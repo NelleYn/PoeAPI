@@ -18,10 +18,18 @@ namespace GameOffsets
     /// </para>
     /// <para>
     /// The offsets below are RELATIVE to <see cref="IngameDataOffsets.Terrain"/>, which sits at
-    /// 0xC08 on this build. The layout is not the reference's: there <c>NumCols</c> and
-    /// <c>NumRows</c> are adjacent 4-byte fields and <c>TileDescriptions</c> is followed
-    /// immediately by <c>LayerMelee</c>; here each scalar is padded to 8 bytes and 0x50 bytes of
+    /// 0xC08 on this build. The layout is not the reference's, and not only in its numbers: the
+    /// reference declares <c>NumCols</c> and <c>NumRows</c> as <c>UInt16</c> at 0x0 and 0x2, and
+    /// <c>TileHeightMultiplier</c> as <c>Int16</c>, with <c>TileDescriptions</c> followed
+    /// immediately by <c>LayerMelee</c>. Here those two counts are 8 bytes apart, and 0x50 bytes of
     /// unidentified data sit between the tile descriptions and the layers.
+    /// </para>
+    /// <para>
+    /// FIELD WIDTH IS NOT PROVEN. The counts are declared <c>int</c> here because that is what
+    /// reads correctly: on the area measured the qwords at 0x00 and 0x08 were 0x57 and 0x51 with
+    /// every upper byte zero. A single sample cannot tell a 4-byte field from a 2-byte one followed
+    /// by zeroes, and the reference calls them 16-bit. It makes no difference to any value an area
+    /// can produce, and it is written down here so that nobody re-derives it as a discovery.
     /// </para>
     /// <para>
     /// UNITS, and the trap in them. <see cref="NumCols"/> and <see cref="NumRows"/> count TILES,
@@ -31,6 +39,13 @@ namespace GameOffsets
     /// <see cref="NumRows"/> as a cell count yields a grid 23 times too short, and nothing in the
     /// numbers themselves says so: on the measured area NumRows was 81 while the grid was 1863
     /// rows tall, and 81 is a perfectly plausible-looking row count.
+    /// </para>
+    /// <para>
+    /// The width does not divide as cleanly as the height, and that is expected rather than a
+    /// discrepancy to chase: on the measured area <c>BytesPerRow * 2</c> is 2002 while
+    /// <c>NumCols * 23</c> is 2001. A row is stored in whole bytes, so an odd cell count is rounded
+    /// up by one padding nibble. The stored width is the one to iterate over; the last column of
+    /// an odd-width area is padding.
     /// </para>
     /// </remarks>
     [StructLayout(LayoutKind.Explicit, Pack = 1)]

@@ -2,6 +2,17 @@
 
 namespace GameOffsets
 {
+    /// <summary>
+    /// Layout of the InGameState object. Only the fields marked MEASURED below were established
+    /// against the installed client; the rest are an older build's numbers.
+    /// </summary>
+    /// <remarks>
+    /// The unmeasured ones are not merely unverified, they are visibly stale: UIHover and
+    /// UIHoverTooltip share 0x4E8, and MouseXGlobal and MouseYGlobal share 0x524 — two coordinates
+    /// cannot live at one address. Six of them are read by Core/, so treat any value that comes out
+    /// of them as unknown until it has been measured the way Data, ServerData and Camera were.
+    /// The reference gives no hypothesis here at all: it has no type named IngameStateOffsets.
+    /// </remarks>
     [StructLayout(LayoutKind.Explicit, Pack = 1)]
     public struct IngameStateOffsets
     {
@@ -30,7 +41,12 @@ namespace GameOffsets
         [FieldOffset(0xE70)] public long FPSRectangle;
         [FieldOffset(0x554)] public float TimeInGame;
         [FieldOffset(0x558)] public float TimeInGameF;
-        [FieldOffset(0xF4C)] public int Camera;
+        // MEASURED. The camera is a separate object, not something embedded in IngameState: the
+        // address the reference reports for it is LOWER than IngameState's own, so no offset from
+        // this object could ever reach it. The pointer to it is here, as the only match in a
+        // 0x10000 window. The old number (0xF4C, read as an embedded struct) landed in a text
+        // buffer: the bytes there spell "ntributi" / "on = 0.0".
+        [FieldOffset(0x270)] public long Camera;
         [FieldOffset(0x524)] public int MouseXGlobal;
         [FieldOffset(0x524)] public int MouseYGlobal;
         [FieldOffset(0x524)] public float MouseXInGame;

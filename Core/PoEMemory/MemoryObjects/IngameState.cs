@@ -32,14 +32,17 @@ namespace ExileCore.PoEMemory.MemoryObjects
         {
             _ingameState = new FrameCache<IngameStateOffsets>(() => M.Read<IngameStateOffsets>(Address /*+M.offsets.IgsOffsetDelta*/));
 
-            _camera = new AreaCache<Camera>(
-                () => GetObject<Camera>(Address + /*0x1258*/Extensions.GetOffset<IngameStateOffsets>(nameof(IngameStateOffsets.Camera))));
+            // Camera is reached through a POINTER, not as a struct embedded in IngameState. The
+            // address the reference reports for it is lower than IngameState's own, so the old
+            // "Address + offset" model could not reach it at any offset; what it did reach, at
+            // 0xF4C, was a text buffer.
+            _camera = new AreaCache<Camera>(() => GetObject<Camera>(_ingameState.Value.Camera));
 
             _ingameData = new AreaCache<IngameData>(() => GetObject<IngameData>(_ingameState.Value.Data));
             // ServerData is NOT a field of IngameState on this client. Measured: the true address
             // the reference distribution reports for it does not occur ANYWHERE in the first 0x2000
             // bytes of IngameState, while it sits at IngameData + 0x968 as the only match in the
-            // window, in three different zones. So it is reached through Data, exactly as the
+            // window, in two different zones. So it is reached through Data, exactly as the
             // reference reaches it; IngameStateOffsets.ServerData is an older build's number and is
             // no longer read. This is also why InGame used to report false while the game state
             // controller said we were in game: the flag was being read out of an unrelated address.

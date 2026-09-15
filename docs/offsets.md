@@ -43,14 +43,35 @@ offset, and it is worth stating because it is what makes the numbers claims rath
    library and prints what it sees;
 2. `tools/FindOffset --find --in <object> --len 0x1000 --value <true address>` reports every
    place inside the object where that address actually lies;
-3. the answer counts only if the match is **unique**, and only if it survives repetition - each
-   offset above reproduced in three different zones, with a different base address for the
-   object and different values in its fields each time.
+3. the answer counts only if it survives **repetition**: a different zone gives the object a new
+   base address and new values in its fields, and the offset has to come out the same.
+
+Uniqueness alone is a weaker argument than it looks, and the source says so per field. A match is
+unique only *within the window it was searched*: widen the window from `0x1000` to `0x2000` and the
+player pointer turns up **twice** (`0x970` and `0x10E8`); widen it to `0x10000` and a one-byte value
+like the area level has seven candidates. Repetition across zones is what actually carries the
+weight, and it is not uniform: the area level and hash reproduced in three zones, the pointers and
+the terrain block in two, `MapStats` in one (but identified by content), `SleepingEntityCount` and
+`EnvironmentData` in one. Every raw number behind those claims, zone by zone, is in
+[api/ingamedata-measured.md](api/ingamedata-measured.md); `tools/measure-ingamedata.sh` reproduces
+the whole table in one command.
 
 `MapStats` was confirmed the strongest way available here, by **content**: the reference
 reported eleven `(stat, value)` pairs, and the array this field points at holds exactly those
-eleven pairs, in that order. The earlier guess for it - the 48-byte run of zeroes between
-`CurrentAreaLevel` and `CurrentAreaHash` - was refuted by that same measurement.
+eleven pairs, in that order, ending exactly after them. The earlier guess for it - the 48-byte run
+of zeroes between `CurrentAreaLevel` and `CurrentAreaHash` - was refuted by that same measurement.
+
+The same method reached one field outside this struct. `Camera` is **not** embedded in
+`IngameState`: the address the reference reports for it is lower than `IngameState`'s own, so no
+offset from that object could reach it. The pointer to it sits at `IngameState + 0x270`, as the only
+match in a `0x10000` window; the number it replaced (`0xF4C`, read as an embedded struct) landed in
+a text buffer. `ServerData` had the same shape of error and is described in
+`Core/PoEMemory/MemoryObjects/IngameState.cs`.
+
+Note what the method does **not** establish. `tools/RefLive` runs the reference's own code against
+the same process, so all of this proves *this fork reads what the reference reads* - not *this is
+the layout of the game's own struct*. And `tools/parity.sh` is no help here at all: it counts
+**names** on the reference's API surface and never checks a single number.
 
 `LabDataPtr` is the one field left standing on an old build's number, and it is marked as such
 in the source. The character was not in the Labyrinth, so the reference reported `null` and

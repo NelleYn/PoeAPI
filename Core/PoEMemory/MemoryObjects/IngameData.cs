@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ExileCore.Shared.Cache;
 using ExileCore.Shared.Enums;
@@ -16,7 +16,6 @@ namespace ExileCore.PoEMemory.MemoryObjects
         private readonly CachedValue<long> _EntitiesCount;
         private EntityList _EntityList;
         private readonly CachedValue<Entity> _localPlayer;
-        private NativePtrArray cacheMapStats;
         private NativePtrArray cacheStats;
         private readonly Dictionary<GameStat, int> mapStats = new Dictionary<GameStat, int>();
 
@@ -41,7 +40,28 @@ namespace ExileCore.PoEMemory.MemoryObjects
         public long EntiteisTest => DataStruct.EntityList;
         public EntityList EntityList => _EntityList ?? (_EntityList = GetObject<EntityList>(DataStruct.EntityList));
         private long LabDataPtr => _cacheStruct.Value.LabDataPtr;
-        public LabyrinthData LabyrinthData => LabDataPtr == 0 ? null : GetObject<LabyrinthData>(LabDataPtr);
+
+        /// <summary>
+        /// Labyrinth layout, or <c>null</c> when there is none to read.
+        /// </summary>
+        /// <remarks>
+        /// The offset of LabDataPtr is NOT established on this build (see IngameDataOffsets), so
+        /// whatever is read here can be anything, and "not zero" is not a test: at 0x11C this object
+        /// currently holds 0x92CFB39000000021, which is neither zero nor a pointer. The old code
+        /// handed exactly that to GetObject and returned a LabyrinthData whose every read comes back
+        /// silently zero — the worst possible answer, because it looks like data. Until the offset is
+        /// measured, only a canonically shaped pointer is accepted; everything else is null.
+        /// </remarks>
+        public LabyrinthData LabyrinthData =>
+            IsCanonicalPointer(LabDataPtr) ? GetObject<LabyrinthData>(LabDataPtr) : null;
+
+        /// <summary>
+        /// Whether a value has the shape of a user-mode heap pointer on x64: inside the user half of
+        /// the address space and 8-aligned. Every offset measured on this client points at an
+        /// 8-aligned address, so this rejects the usual garbage without pretending to validate it.
+        /// </summary>
+        private static bool IsCanonicalPointer(long value) =>
+            value >= 0x10000L && value <= 0x7FFFFFFFFFFFL && (value & 7) == 0;
 
         public Dictionary<GameStat, int> MapStats
         {
@@ -53,14 +73,18 @@ namespace ExileCore.PoEMemory.MemoryObjects
                 var statPtrEnd = _cacheStruct.Value.MapStats.Last;
                 var key = 0;
                 var value = 0;
-                var total_stats = (int) (statPtrEnd - statPtrStart);
+                // A stat array is whole 8-byte (key, value) pairs and nothing else. The test runs on
+                // the 64-bit span BEFORE it is narrowed, which is the whole point of doing it here:
+                // a span of 0x1_0000_0010 truncates to 16 and would sail through every check that
+                // looks only at the int. Anything ragged, negative or absurdly long means stale
+                // pointers or a wrong offset, and the only safe answer is to read nothing — ReadMem
+                // takes the length on trust, and this project has already paid for one unbounded read.
+                var span = statPtrEnd - statPtrStart;
 
-                // A stat array is whole 8-byte (key, value) pairs and nothing else. Anything that is
-                // not — negative, ragged, or absurdly long — means the pointers are stale or the
-                // offset is wrong, and the only safe answer is to read nothing: ReadMem takes the
-                // length on trust, and this project has already paid for an unbounded read once.
-                if (total_stats < 0 || total_stats % 8 != 0 || total_stats / 8 > 200)
+                if (span < 0 || span % 8 != 0 || span / 8 > 200)
                     return null;
+
+                var total_stats = (int) span;
 
                 var bytes = M.ReadMem(statPtrStart, total_stats);
 
@@ -76,12 +100,29 @@ namespace ExileCore.PoEMemory.MemoryObjects
             }
         }
 
+        /// <summary>
+        /// Open town portals in this area.
+        /// </summary>
+        /// <remarks>
+        /// NOT MEASURED. 0x4B4 and 0x4BC are an older build's numbers, they bypass
+        /// IngameDataOffsets entirely, and they are not even 8-aligned while every offset measured
+        /// on this client is. On the area measured they read as two zeroes, so the result is an
+        /// empty list — which reads as "no portals here" rather than "this offset is wrong", and
+        /// that is exactly the failure this repository keeps paying for. The guard below at least
+        /// stops a garbage pair from being handed to ReadStructsArray as a length.
+        /// To close it: open a portal, ask tools/RefLive for the list the reference sees, and
+        /// locate it the usual way.
+        /// </remarks>
         public IList<PortalObject> TownPortals
         {
             get
             {
                 var statPtrStart = M.Read<long>(Address + 0x4B4);
                 var statPtrEnd = M.Read<long>(Address + 0x4BC);
+
+                if (!IsCanonicalPointer(statPtrStart) || !IsCanonicalPointer(statPtrEnd) ||
+                    statPtrEnd < statPtrStart)
+                    return new List<PortalObject>();
 
                 return M.ReadStructsArray<PortalObject>(statPtrStart, statPtrEnd, PortalObject.StructSize, TheGame);
             }
