@@ -5,7 +5,11 @@ namespace GameOffsets
     [StructLayout(LayoutKind.Explicit, Pack = 1)]
     public struct IngameStateOffsets
     {
-        [FieldOffset(0x370)] public long Data;
+        // Measured against the installed client on 2026-09-15, not inherited from the old build.
+        // The reference distribution reports IngameState.Data at this offset for the same process,
+        // 0x218 is the only match in a 0x2000 window, and the object it points at carries this
+        // zone's level and hash. Neighbouring fields below are still from the old build.
+        [FieldOffset(0x218)] public long Data;
         [FieldOffset(0x378)] public long ServerData;
         [FieldOffset(0x78)] public long IngameUi;
         [FieldOffset(0x4A0)] public long UIRoot;
