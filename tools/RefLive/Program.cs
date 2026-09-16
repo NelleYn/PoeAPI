@@ -196,6 +196,10 @@ namespace ExileApi.Tools.RefLive
             DumpDictionaryMember(data, "MapStats");
             DumpDictionaryMember(data, "MapStatsVisible");
 
+            // Порталы города: список объектов, у каждого свой адрес. Адреса и нужны — по ним
+            // ищется вектор, в котором они лежат подряд.
+            DumpListMember(data, "TownPortals");
+
             Console.WriteLine();
             Console.WriteLine("ДАЛЬШЕ: смещение внутри IngameState считает FindOffset —");
             Console.WriteLine($"  FindOffset.exe --find --ingame-state --len 0x2000 --value 0x{data.Address:X}");
@@ -420,6 +424,42 @@ namespace ExileApi.Tools.RefLive
 
                 Console.WriteLine($"      .{field.Name,-18} {Describe(inner)}");
             }
+        }
+
+        // Список эталона печатается по элементам, с АДРЕСОМ каждого: именно адрес элемента ищется
+        // потом в окне владельца — вектор хранит их подряд, и первый из них равен полю First.
+        private static void DumpListMember(object owner, string name)
+        {
+            var value = Member(owner, name, out var error);
+
+            if (error != null || value == null)
+            {
+                Console.WriteLine($"  Data.{name,-22} {error ?? "(null)"}");
+                return;
+            }
+
+            if (value is not System.Collections.IEnumerable list)
+            {
+                Console.WriteLine($"  Data.{name,-22} не список: {value.GetType().Name}");
+                return;
+            }
+
+            var total = 0;
+
+            foreach (var item in list)
+            {
+                total++;
+
+                if (total > 16) continue;
+
+                var address = item == null ? null : Member(item, "Address", out _);
+
+                Console.WriteLine(address is long a
+                    ? $"      [{total - 1}] 0x{a:X}  {item}"
+                    : $"      [{total - 1}] {item}");
+            }
+
+            Console.WriteLine($"  Data.{name,-22} элементов: {total}");
         }
 
         // Словарь эталона печатается парами «ключ=значение» в СЫРОМ виде: в памяти пара лежит как
