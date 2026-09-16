@@ -107,14 +107,26 @@ namespace GameOffsets
         /// the component list (Positioned, Stats, Pathfinding, Buffs, Life, Animated). That is a
         /// live character, not a number that happened to match.
         /// <para>
-        /// What is still open is not whether this is the player, but whether this is THE field:
-        /// two places in this object hold the same pointer, 0x970 and 0x10E8. This one is chosen
-        /// because it is exactly <see cref="ServerData"/> + 8, reproducing both the order AND the
-        /// spacing the reference declares for these two fields. The other one has since been
-        /// identified rather than dismissed: 0x10E8 is field +0x30 of a sub-object with its own
-        /// vtable at Data + 0x10B8, the same sub-object <see cref="EnvironmentData"/> belongs to —
-        /// so it is a second owner's reference to the player, not the field itself. Chasing a state
-        /// where the two disagree is not worth a separate session.
+        /// Two places in this object hold the same player pointer, 0x970 and 0x10E8. This one is
+        /// chosen because it is exactly <see cref="ServerData"/> + 8, reproducing both the order AND
+        /// the spacing the reference declares for these two fields.
+        /// </para>
+        /// <para>
+        /// WHAT 0x10E8 ACTUALLY IS, and a correction. An earlier note here called 0x10E8 an
+        /// unrelated run of floats and counters. That was WRONG, and it is worth saying so rather
+        /// than quietly deleting it: it dismissed a live pointer as noise, which is the failure mode
+        /// this file exists to avoid. The survey of 2026-09-16 (docs/api/survey-2026-09-16.md)
+        /// identified it instead — 0x10E8 is field +0x30 of a sub-object that begins at Data +
+        /// 0x10B8 and carries its OWN vtable there, and <see cref="EnvironmentData"/> at 0x1110 is
+        /// field +0x58 of that same sub-object. So 0x10E8 is a second owner's reference to the
+        /// player, not a coincidence and not floats. Status of that finding: MEASURED ON A LIVE
+        /// CLIENT, NOT RE-CONFIRMED.
+        /// </para>
+        /// <para>
+        /// What that leaves open is only which of the two the reference's own field is, and the two
+        /// can disagree only in a state where there is no player. Since 0x10E8 is now identified as
+        /// somebody else's copy rather than a rival candidate, chasing such a state is not worth a
+        /// separate session.
         /// </para>
         /// </remarks>
         [FieldOffset(0x970)] public long LocalPlayer;

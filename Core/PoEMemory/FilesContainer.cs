@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 using ExileCore.PoEMemory.FilesInMemory;
 using ExileCore.PoEMemory.FilesInMemory.Atlas;
 using ExileCore.PoEMemory.FilesInMemory.Metamorph;
@@ -210,24 +209,77 @@ public class FilesContainer
         }
     }
 
-    /// <summary>Looks up the pointer to the named file, exiting the process when it cannot be found.</summary>
+    /// <summary>Names already reported as missing, so that a lookup that keeps failing is logged once.</summary>
+    private readonly HashSet<string> _reportedMissingFiles = new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>Looks up the pointer to the named file.</summary>
     /// <param name="name">The file path to resolve (e.g. "Data/Mods.dat").</param>
-    /// <returns>The pointer to the file's information record, or 0 when unavailable.</returns>
+    /// <returns>
+    /// The pointer to the file's information record, or 0 when the file is not in the table.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// WHY 0 IS SAFE HERE. The return type is <see cref="long"/>, so there is no null to survive:
+    /// 0 is already this codebase's "file unavailable" value. Every caller is inside this class and
+    /// passes <c>FindFile</c> as the <c>Func&lt;long&gt;</c> of a <see cref="FileInMemory"/>, and
+    /// <see cref="FileInMemory.RecordAddresses"/> tests that address for 0 before walking anything,
+    /// yielding an empty table instead of dereferencing. So a missing file costs the consumer an
+    /// empty table, which is what it already got for a file whose record count read as 0.
+    /// </para>
+    /// <para>
+    /// WHAT WAS REMOVED AND WHY. This used to raise a MessageBox and call Environment.Exit(1).
+    /// Diagnostics must not kill the caller — the same rule PerformanceTimer.StopAndPrint broke
+    /// when it took down TheGame's constructor (see README). Killing the host also loses the very
+    /// information that would explain the failure. The handler was dead code besides: it was a
+    /// <c>catch (KeyNotFoundException)</c> around
+    /// <see cref="Dictionary{TKey,TValue}.TryGetValue"/>, which returns false on a missing key and
+    /// does not throw, so the only way into it was an exception TryGetValue never raises. The real
+    /// unhandled failure was <see cref="AllFiles"/> being null, which threw past this method
+    /// entirely; that case is now handled explicitly.
+    /// </para>
+    /// <para>
+    /// The report is deduplicated per name because this is reached from lazy property getters that
+    /// re-evaluate; a log line per call would be its own kind of damage.
+    /// </para>
+    /// </remarks>
     public long FindFile(string name)
     {
-        try
+        if (name == null)
         {
-            if (AllFiles.TryGetValue(name, out var result))
-                return result.Ptr;
-        }
-        catch (KeyNotFoundException)
-        {
-            const string MESSAGE_FORMAT = "Couldn't find the file in memory: {0}\nTry to restart the game.";
-            MessageBox.Show(string.Format(MESSAGE_FORMAT, name), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            Environment.Exit(1);
+            DebugWindow.LogError($"{nameof(FilesContainer)}.{nameof(FindFile)}: called with a null file name.");
+            return 0;
         }
 
+        var allFiles = AllFiles;
+
+        if (allFiles == null)
+        {
+            ReportMissingFile($"{nameof(FilesContainer)}.{nameof(FindFile)}: the file table has not been loaded yet, " +
+                              $"cannot resolve \"{name}\". Returning 0 (file unavailable).", name);
+            return 0;
+        }
+
+        if (allFiles.TryGetValue(name, out var result))
+            return result.Ptr;
+
+        ReportMissingFile($"{nameof(FilesContainer)}.{nameof(FindFile)}: \"{name}\" is not in the game's file table " +
+                          $"({allFiles.Count} files loaded). Returning 0 (file unavailable); restarting the game " +
+                          $"usually repopulates the table.", name);
         return 0;
+    }
+
+    /// <summary>Logs the first failure for a given file name and stays silent on the repeats.</summary>
+    /// <param name="message">The message to log.</param>
+    /// <param name="name">The file name the failure is about.</param>
+    private void ReportMissingFile(string message, string name)
+    {
+        lock (_reportedMissingFiles)
+        {
+            if (!_reportedMissingFiles.Add(name))
+                return;
+        }
+
+        DebugWindow.LogError(message);
     }
 
     #region Bestiary

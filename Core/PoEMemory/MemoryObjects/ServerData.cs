@@ -12,15 +12,37 @@ namespace ExileCore.PoEMemory.MemoryObjects
 {
     public class ServerData : RemoteMemoryObject
     {
-        private static readonly int NetworkStateOff =
-            Extensions.GetOffset<ServerDataOffsets>(nameof(ServerDataOffsets.NetworkState)) + ServerDataOffsets.Skip;
+        /// <summary>
+        /// Turns a field name of <see cref="ServerDataOffsets"/> into an offset FROM
+        /// <see cref="RemoteMemoryObject.Address"/>.
+        /// </summary>
+        /// <remarks>
+        /// <c>Extensions.GetOffset</c> returns the offset INSIDE the blitted window (see
+        /// <see cref="ServerDataOffsets.StructBase"/>), so the window base has to be added back
+        /// before the number can be used as "Address + offset". Forgetting that is not a
+        /// hypothetical: the stash-tab readers below did exactly that and were addressing 0x5000
+        /// below the field they name. Every conversion now goes through here so there is one place
+        /// to get it right.
+        /// </remarks>
+        private static int FromAddress(string fieldName) =>
+            Extensions.GetOffset<ServerDataOffsets>(fieldName) + ServerDataOffsets.StructBase;
+
+        private static readonly int NetworkStateOff = FromAddress(nameof(ServerDataOffsets.NetworkState));
 
         private readonly CachedValue<ServerDataOffsets> _cachedValue;
+        private readonly CachedValue<int> _latency;
         private readonly List<Player> result = new List<Player>();
 
         public ServerData()
         {
-            _cachedValue = new FrameCache<ServerDataOffsets>(() => M.Read<ServerDataOffsets>(Address + ServerDataOffsets.Skip));
+            _cachedValue = new FrameCache<ServerDataOffsets>(() => M.Read<ServerDataOffsets>(Address + ServerDataOffsets.StructBase));
+
+            // Latency lies far outside the blitted window and is therefore its own 4-byte read
+            // rather than a struct field - see ServerDataOffsets.LATENCY both for the provenance of
+            // 0xC490 and for why widening the struct to reach it would have been the wrong trade.
+            // Cached per frame like the struct, so a plugin polling this in a loop does not turn
+            // into one ReadProcessMemory call per poll.
+            _latency = new FrameCache<int>(() => Address == 0 ? 0 : M.Read<int>(Address + ServerDataOffsets.LATENCY));
         }
 
         public ServerDataOffsets ServerDataStruct => _cachedValue.Value;
@@ -78,7 +100,19 @@ namespace ExileCore.PoEMemory.MemoryObjects
         public PartyStatus PartyStatusType => (PartyStatus) this.ServerDataStruct.PartyStatusType;
         public bool IsInGame => NetworkState == NetworkStateE.Connected;
         public NetworkStateE NetworkState => (NetworkStateE) this.ServerDataStruct.NetworkState;
-        public int Latency => ServerDataStruct.Latency;
+        /// <summary>
+        /// Round-trip latency to the game server in milliseconds, exactly as read - NOT clamped,
+        /// NOT defaulted. Callers that pace themselves by it must decide for themselves what to do
+        /// with an implausible number; <see cref="IngameState.CurLatency"/> is the one that does.
+        /// Reads 0 while <see cref="RemoteMemoryObject.Address"/> is 0, i.e. out of game.
+        /// </summary>
+        /// <remarks>
+        /// The offset moved from 0x6CA0 to <see cref="ServerDataOffsets.LATENCY"/> (0xC490) on
+        /// 2026-09-16. The old one read 0x128CBA26 on the live client, which is not a latency under
+        /// any interpretation; the new one was measured. The full provenance, including the honest
+        /// weakness of that measurement, is on ServerDataOffsets.LATENCY.
+        /// </remarks>
+        public int Latency => _latency.Value;
         public string Guild => NativeStringReader.ReadString(M.Read<long>(Address + 0x70E0), M);
         public BetrayalData BetrayalData => GetObject<BetrayalData>(M.Read<long>(Address + 0x3C8, 0x718));
 
@@ -141,12 +175,20 @@ namespace ExileCore.PoEMemory.MemoryObjects
         #region Stash Tabs
 
         // public IList<ServerStashTab> PlayerStashTabs => GetStashTabs(Extensions.GetOffset<ServerDataOffsets>("PlayerStashTabsStart"), Extensions.GetOffset<ServerDataOffsets>("PlayerStashTabsEnd"));
+        // These two take an offset FROM Address, so they go through FromAddress. Before that they
+        // passed the raw window-relative number and were reading Address + 0x1CB0 / Address + 0x23E0
+        // for fields the table declares at Address + 0x6CB0 / Address + 0x73E0 - 0x5000 short, in
+        // memory that has nothing to do with stash tabs.
+        //
+        // What this fixes and what it does NOT: the code now reads the address it names. The named
+        // offsets themselves are upstream legacy and were NOT measured by the 2026-09-16 survey, so
+        // a stash list that comes back looking sensible is still not evidence that 0x6CB0 is right.
         public IList<ServerStashTab> PlayerStashTabs =>
-            GetStashTabs(Extensions.GetOffset<ServerDataOffsets>(nameof(ServerDataOffsets.PlayerStashTabs)),
-                Extensions.GetOffset<ServerDataOffsets>(nameof(ServerDataOffsets.PlayerStashTabs)) + 0x8);
+            GetStashTabs(FromAddress(nameof(ServerDataOffsets.PlayerStashTabs)),
+                FromAddress(nameof(ServerDataOffsets.PlayerStashTabs)) + 0x8);
         public IList<ServerStashTab> GuildStashTabs =>
-            GetStashTabs(Extensions.GetOffset<ServerDataOffsets>(nameof(ServerDataOffsets.GuildStashTabs)),
-                Extensions.GetOffset<ServerDataOffsets>(nameof(ServerDataOffsets.GuildStashTabs)) + 0x8);
+            GetStashTabs(FromAddress(nameof(ServerDataOffsets.GuildStashTabs)),
+                FromAddress(nameof(ServerDataOffsets.GuildStashTabs)) + 0x8);
 
         private IList<ServerStashTab> GetStashTabs(int offsetBegin, int offsetEnd)
         {
