@@ -101,12 +101,20 @@ namespace GameOffsets
         /// Pointer to the Entity of the local character.
         /// </summary>
         /// <remarks>
-        /// Two places in this object hold that pointer: 0x970 and 0x10E8. This one is chosen
+        /// Confirmed by CONTENT: the reference's own Entity parser, aimed at what this field points
+        /// at (tools/RefLive --as Entity &lt;address&gt;), reads out the character — a world position,
+        /// eighteen named buffs (Discipline Aura, Grace Aura, Haste, Precision, One Step Ahead) and
+        /// the component list (Positioned, Stats, Pathfinding, Buffs, Life, Animated). That is a
+        /// live character, not a number that happened to match.
+        /// <para>
+        /// What is still open is not whether this is the player, but whether this is THE field:
+        /// two places in this object hold the same pointer, 0x970 and 0x10E8. This one is chosen
         /// because it is exactly <see cref="ServerData"/> + 8, reproducing both the order AND the
         /// spacing the reference declares for these two fields, while 0x10E8 sits in an unrelated
-        /// run of floats and counters. That is an argument from structure, not a measurement: the
-        /// two candidates would be told apart properly by a state in which they disagree, such as
-        /// a loading screen or character select, where one of them should go null first.
+        /// run of floats and counters. That is an argument from structure. The two would be told
+        /// apart by a state in which they disagree — a loading screen or character select, where
+        /// one of them should go null first.
+        /// </para>
         /// </remarks>
         [FieldOffset(0x970)] public long LocalPlayer;
 

@@ -105,14 +105,26 @@ namespace ExileCore.PoEMemory.MemoryObjects
         /// Open town portals in this area.
         /// </summary>
         /// <remarks>
-        /// NOT MEASURED. 0x4B4 and 0x4BC are an older build's numbers, they bypass
-        /// IngameDataOffsets entirely, and they are not even 8-aligned while every offset measured
-        /// on this client is. On the area measured they read as two zeroes, so the result is an
-        /// empty list — which reads as "no portals here" rather than "this offset is wrong", and
-        /// that is exactly the failure this repository keeps paying for. The guard below at least
-        /// stops a garbage pair from being handed to ReadStructsArray as a length.
-        /// To close it: open a portal, ask tools/RefLive for the list the reference sees, and
-        /// locate it the usual way.
+        /// NOT MEASURED, and now demonstrably WRONG rather than merely unverified. 0x4B4 and 0x4BC
+        /// are an older build's numbers, they bypass IngameDataOffsets entirely, and they are not
+        /// even 8-aligned while every offset measured on this client is. Measured with a portal
+        /// actually open in the zone: 0x4A0 through 0x4C8 is a solid run of zeroes, so this always
+        /// returns an empty list — which reads as "no portals here" rather than "this offset is
+        /// wrong". The guard below at least stops a garbage pair from reaching ReadStructsArray as
+        /// a length.
+        /// <para>
+        /// Asking the reference does not help: with a portal open it reports TownPortals as empty
+        /// too, the same way it reports LabyrinthData as null inside the Labyrinth. This is the
+        /// only member it models portals with, so there is no other property to ask.
+        /// </para>
+        /// <para>
+        /// How to close it: by DIFFERENCE, the way LabDataPtr was closed. Two window dumps of this
+        /// object in the SAME zone, one with no portal and one with a portal open, fed to
+        /// tools/dumpdiff.py. One attempt has been made and did not land: the window was 0x2000,
+        /// and inside it nothing gained an element — the only thing that appeared was a vector at
+        /// 0x90 that is empty in both states and reallocates on its own. So the list is further out
+        /// than 0x2000, and the next attempt needs 0x10000 on BOTH dumps.
+        /// </para>
         /// </remarks>
         public IList<PortalObject> TownPortals
         {
