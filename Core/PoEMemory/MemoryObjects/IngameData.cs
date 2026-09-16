@@ -118,12 +118,20 @@ namespace ExileCore.PoEMemory.MemoryObjects
         /// only member it models portals with, so there is no other property to ask.
         /// </para>
         /// <para>
-        /// How to close it: by DIFFERENCE, the way LabDataPtr was closed. Two window dumps of this
-        /// object in the SAME zone, one with no portal and one with a portal open, fed to
-        /// tools/dumpdiff.py. One attempt has been made and did not land: the window was 0x2000,
-        /// and inside it nothing gained an element — the only thing that appeared was a vector at
-        /// 0x90 that is empty in both states and reallocates on its own. So the list is further out
-        /// than 0x2000, and the next attempt needs 0x10000 on BOTH dumps.
+        /// The difference method, which closed LabDataPtr, was applied here twice and did not land.
+        /// Two zones, a portal opened in each, both dumps of the same base in the same zone, the
+        /// second pair over a 0x10000 window — the largest a single window can be. Result both
+        /// times: 18-19 qwords out of 8192 changed, and NOT ONE VECTOR GAINED AN ELEMENT. The only
+        /// "zero turned into a pointer" transitions were two vectors, at 0x90 and 0xA48, that are
+        /// empty in both states (First == Last), reallocate on their own between reads, and are
+        /// therefore scratch, not a portal list.
+        /// </para>
+        /// <para>
+        /// So the finding is not "not measured yet" but "not here": on this build the list of
+        /// portals is not in the first 0x10000 bytes of this object. Closing it needs a different
+        /// approach than another dump of the same window — most likely locating the portal ENTITY
+        /// first (the reference parses entities correctly, see tools/RefLive --as Entity) and then
+        /// looking for who points at it.
         /// </para>
         /// </remarks>
         public IList<PortalObject> TownPortals
