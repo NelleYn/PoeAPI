@@ -25,18 +25,27 @@ namespace GameOffsets
     /// </para>
     /// <list type="bullet">
     /// <item><description>
-    /// Three zones (levels 67, 60, 83): <see cref="CurrentAreaLevel"/>, <see cref="CurrentAreaHash"/>.
+    /// Four zones (levels 67, 60, 83, 33): <see cref="CurrentAreaLevel"/>,
+    /// <see cref="CurrentAreaHash"/>.
     /// </description></item>
     /// <item><description>
-    /// Two zones (levels 60, 83): <see cref="CurrentArea"/>, <see cref="ServerData"/>,
+    /// Three zones (levels 60, 83, 33): <see cref="CurrentArea"/>, <see cref="ServerData"/>,
     /// <see cref="LocalPlayer"/>, <see cref="EntityList"/>, <see cref="EntitiesCount"/>,
     /// <see cref="SleepingEntityList"/>, <see cref="Terrain"/> and all of its members.
     /// </description></item>
     /// <item><description>
-    /// One zone, but confirmed by content: <see cref="MapStats"/>. One zone only:
-    /// <see cref="SleepingEntityCount"/>, <see cref="EnvironmentData"/>.
+    /// Two zones: <see cref="MapStats"/> (a map and the Labyrinth, identified by content both
+    /// times), <see cref="SleepingEntityCount"/>, <see cref="EnvironmentData"/>.
+    /// </description></item>
+    /// <item><description>
+    /// One state, but by content and against a control: <see cref="LabDataPtr"/>.
     /// </description></item>
     /// </list>
+    /// <para>
+    /// ASLR IS COVERED. The last zone was measured after a full client restart: TheGame moved from
+    /// 0x44C0C092E80 to 0x5F4F6093300 and IngameState from 0x44C17002C10 to 0x5F4FC562810, a
+    /// different address space entirely, and every offset below came out the same.
+    /// </para>
     /// <para>
     /// WHY THE REFERENCE'S OWN NUMBERS ARE NOT USED. Its IngameDataOffsets declares
     /// <c>LocalPlayer</c> and <c>EntityList</c> 8 bytes apart; here they are 0xB8 apart. What does
@@ -61,7 +70,9 @@ namespace GameOffsets
         /// <summary>
         /// Monster level of the current area. One byte, as in the reference: the value is capped
         /// around 100, and the three bytes above it were zero in every zone measured. Seen as 67,
-        /// 60 and 83 in three different zones, always at this offset.
+        /// 60, 83 and 33 in four different zones, always at this offset. The value itself is a poor
+        /// search key — a single byte matches in seven places in a 0x10000 window — so it is the
+        /// repetition that establishes this, not the search.
         /// </summary>
         [FieldOffset(0xD4)] public byte CurrentAreaLevel;
 
@@ -125,25 +136,35 @@ namespace GameOffsets
         /// </summary>
         [FieldOffset(0x1110)] public long EnvironmentData;
 
-        // ── NOT MEASURED ────────────────────────────────────────────────────────────────────────
-        // LabDataPtr is a leftover from an older build, kept only so that the consumer in Core/
-        // keeps compiling. It is NOT a claim about this client, and it is worse than merely
-        // unverified: 0x11C is not even 8-aligned, while every offset measured on this client is,
-        // and the bytes there currently read as 0x92CFB39000000021 — neither zero nor a pointer. A
-        // "== 0" test therefore protects nobody, which is why IngameData.LabyrinthData now demands
-        // a canonically shaped pointer before it builds anything.
-        //
-        // Why it could not be measured: the character was not in the Labyrinth, so the reference
-        // reported null and there was no address to search for. The order hypothesis does not help
-        // either — the reference declares this field immediately before CurrentArea, and the
-        // matching place here (0xA8) holds UTF-16 text rather than a pointer.
-        //
-        // How to close it: enter the Labyrinth and measure by DIFFERENCE rather than by oracle.
-        // Dump this object's first 0xB0 bytes before and after entering, and look for the qword
-        // that turns from zero into a pointer. The head of the object is currently zero from 0x30
-        // to 0x88, which is exactly the shape of a field that is empty outside the Labyrinth.
-
-        /// <summary>NOT MEASURED on this build. See the remark above.</summary>
-        [FieldOffset(0x11C)] public long LabDataPtr;
+        /// <summary>
+        /// Pointer to the Labyrinth layout, or zero outside it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Measured WITHOUT the oracle, and that is the interesting part: inside the Labyrinth the
+        /// reference still reports LabyrinthData as null, so there was no true address to search
+        /// for. The reference is right about the fields its users exercise, and this is not one of
+        /// them — a reminder that "the reference reads this client correctly" is a working
+        /// assumption, not a law.
+        /// </para>
+        /// <para>
+        /// Found by DIFFERENCE: the head of this object is a long run of zeroes outside the
+        /// Labyrinth, and inside it exactly one qword in that run — 0x48 — turns into a heap
+        /// pointer. Confirmed by CONTENT with the reference's own parser aimed at that address
+        /// (tools/RefLive --as LabyrinthData &lt;address&gt;): it returns ten rooms of a coherent
+        /// layout — Entry_1_Simple EntranceStraight, Boss1, Middle_1_SimpleN, End_1_Modal — with
+        /// secrets such as SilverKey and SilverDoorReward and a LinkedWith graph whose room
+        /// addresses agree in both directions. The same parser aimed at ServerData and at
+        /// EntityList returns zero rooms, so the result is not something the parser invents.
+        /// </para>
+        /// <para>
+        /// The old number was 0x11C, which is not even 8-aligned while every offset measured on
+        /// this client is, and which read as 0x92CFB39000000021 — neither zero nor a pointer. The
+        /// "== 0" guard in IngameData.LabyrinthData let that through and built an object out of it;
+        /// the guard now demands a canonically shaped pointer, which also handles the honest zero
+        /// this field holds outside the Labyrinth.
+        /// </para>
+        /// </remarks>
+        [FieldOffset(0x48)] public long LabDataPtr;
     }
 }

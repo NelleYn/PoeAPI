@@ -31,10 +31,16 @@ namespace ExileApi.Tools.RefLive
 
         private static string _refDir;
 
+        // Аргументы нужны глубоко внутри Run(), а он вызывается без параметров: обработчик
+        // разрешения сборок должен быть поставлен ДО первого обращения к типам эталона.
+        private static string[] _args = Array.Empty<string>();
+
         private static int Main(string[] args)
         {
             try { Console.OutputEncoding = System.Text.Encoding.UTF8; }
             catch { /* консоли может не быть вовсе — не повод падать */ }
+
+            _args = args ?? Array.Empty<string>();
 
             _refDir = args.Length > 0 && !args[0].StartsWith("--")
                 ? args[0]
@@ -108,6 +114,15 @@ namespace ExileApi.Tools.RefLive
             var game = (ExileCore.PoEMemory.MemoryObjects.TheGame) Construct(
                 typeof(ExileCore.PoEMemory.MemoryObjects.TheGame),
                 new object[] {memory, new ExileCore.Shared.Cache.Cache(), settings, null});
+
+            // Режим --as <Тип> <адрес>: натравить ПАРСЕР ЭТАЛОНА на произвольный адрес и напечатать,
+            // что он оттуда вычитал. Нужен там, где оракул не может назвать адрес сам (его свойство
+            // отдаёт null), но опознать объект по содержимому всё ещё можно — чужой разбор,
+            // написанный без оглядки на нашу гипотезу, либо даёт осмысленные поля, либо нет.
+            var asType = Arg(_args, "--as");
+
+            if (asType != null)
+                return Describe(game, asType, Arg(_args, "--at") ?? Arg(_args, "--as", 2));
 
             Console.WriteLine();
             Console.WriteLine("АДРЕСА ПО ДАННЫМ ЭТАЛОНА");
@@ -184,6 +199,127 @@ namespace ExileApi.Tools.RefLive
             Console.WriteLine();
             Console.WriteLine("ДАЛЬШЕ: смещение внутри IngameState считает FindOffset —");
             Console.WriteLine($"  FindOffset.exe --find --ingame-state --len 0x2000 --value 0x{data.Address:X}");
+
+            return ExitOk;
+        }
+
+        // Возвращает значение ключа из командной строки: Arg(args, "--as") — следующее слово,
+        // Arg(args, "--as", 2) — второе после ключа (так читается "--as Тип адрес").
+        private static string Arg(string[] args, string key, int offset = 1)
+        {
+            for (var i = 0; i < args.Length; i++)
+                if (string.Equals(args[i], key, StringComparison.OrdinalIgnoreCase) &&
+                    i + offset < args.Length)
+                    return args[i + offset];
+
+            return null;
+        }
+
+        // Строит объект эталона нужного типа по заданному адресу и печатает его свойства.
+        // Ничего не «подтверждает» само по себе: подтверждением служит ОСМЫСЛЕННОСТЬ прочитанного.
+        private static int Describe(object game, string typeName, string addressText)
+        {
+            if (string.IsNullOrWhiteSpace(addressText))
+            {
+                Console.WriteLine("--as требует адрес: --as <Тип> <адрес>  (или --as <Тип> --at <адрес>)");
+                return ExitNothingToRead;
+            }
+
+            var text = addressText.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? addressText.Substring(2)
+                : addressText;
+
+            if (!long.TryParse(text, System.Globalization.NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture, out var address) || address <= 0)
+            {
+                Console.WriteLine($"--as: адрес \"{addressText}\" не разобран как HEX.");
+                return ExitNothingToRead;
+            }
+
+            var assembly = game.GetType().Assembly;
+
+            // GetTypes() у эталона бросает: часть его типов ссылается на сборки, которых рядом нет
+            // (MSBuild). Загруженного подмножества достаточно — но брать его надо, не падая.
+            Type[] types;
+
+            try { types = assembly.GetTypes(); }
+            catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
+
+            var type = types.FirstOrDefault(
+                           t => string.Equals(t.Name, typeName, StringComparison.OrdinalIgnoreCase)) ??
+                       types.FirstOrDefault(
+                           t => t.FullName != null &&
+                                t.FullName.IndexOf(typeName, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (type == null)
+            {
+                Console.WriteLine($"--as: у эталона нет типа \"{typeName}\".");
+                return ExitNothingToRead;
+            }
+
+            var generic = game.GetType()
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance |
+                            BindingFlags.FlattenHierarchy)
+                .FirstOrDefault(m => m.Name == "GetObject" && m.IsGenericMethodDefinition &&
+                                     m.GetParameters().Length == 1 &&
+                                     m.GetParameters()[0].ParameterType == typeof(long));
+
+            if (generic == null)
+            {
+                Console.WriteLine("--as: у эталона не нашлось GetObject<T>(long).");
+                return ExitNothingToRead;
+            }
+
+            object built;
+
+            try { built = generic.MakeGenericMethod(type).Invoke(game, new object[] {address}); }
+            catch (Exception e)
+            {
+                Console.WriteLine($"--as: построить {type.Name} по 0x{address:X} не удалось — {DescribeException(e)}");
+                return ExitEmpty;
+            }
+
+            Console.WriteLine($"РАЗБОР ЭТАЛОНА: {type.FullName} по адресу 0x{address:X}");
+            Console.WriteLine(new string('-', 100));
+
+            if (built == null)
+            {
+                Console.WriteLine("  эталон вернул null.");
+                return ExitEmpty;
+            }
+
+            foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                         .Where(x => x.GetIndexParameters().Length == 0)
+                         .OrderBy(x => x.Name))
+            {
+                // Свойства-обратные ссылки (TheGame, M) увели бы печать в весь граф объектов.
+                if (prop.Name == "TheGame" || prop.Name == "M") continue;
+
+                object value;
+
+                try { value = prop.GetValue(built); }
+                catch (Exception e) { value = e; }
+
+                if (value is System.Collections.IEnumerable list and not string)
+                {
+                    var shown = 0;
+                    var total = 0;
+
+                    foreach (var item in list)
+                    {
+                        total++;
+                        if (shown >= 8) continue;
+                        shown++;
+                        Console.WriteLine($"      [{total - 1}] {item}");
+                    }
+
+                    Console.WriteLine($"  {prop.Name,-22} элементов: {total}" +
+                                      (total > shown ? $" (показаны первые {shown})" : ""));
+                    continue;
+                }
+
+                Console.WriteLine($"  {prop.Name,-22} {Describe(value)}");
+            }
 
             return ExitOk;
         }

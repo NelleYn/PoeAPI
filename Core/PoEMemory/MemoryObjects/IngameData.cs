@@ -45,12 +45,13 @@ namespace ExileCore.PoEMemory.MemoryObjects
         /// Labyrinth layout, or <c>null</c> when there is none to read.
         /// </summary>
         /// <remarks>
-        /// The offset of LabDataPtr is NOT established on this build (see IngameDataOffsets), so
-        /// whatever is read here can be anything, and "not zero" is not a test: at 0x11C this object
-        /// currently holds 0x92CFB39000000021, which is neither zero nor a pointer. The old code
-        /// handed exactly that to GetObject and returned a LabyrinthData whose every read comes back
-        /// silently zero — the worst possible answer, because it looks like data. Until the offset is
-        /// measured, only a canonically shaped pointer is accepted; everything else is null.
+        /// The offset is measured (see IngameDataOffsets.LabDataPtr) and the field holds an honest
+        /// zero outside the Labyrinth, so the shape test below is no longer load-bearing — it is
+        /// kept because it costs nothing and because the previous version of this property is
+        /// exactly the failure this repository keeps meeting: the old offset held
+        /// 0x92CFB39000000021, "not zero" accepted it, and the result was a LabyrinthData whose
+        /// every read came back silently zero. That looks like data, which makes it worse than an
+        /// exception.
         /// </remarks>
         public LabyrinthData LabyrinthData =>
             IsCanonicalPointer(LabDataPtr) ? GetObject<LabyrinthData>(LabDataPtr) : null;

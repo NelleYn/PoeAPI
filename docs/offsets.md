@@ -30,11 +30,11 @@ public struct IngameDataOffsets
     [FieldOffset(0xA38)] public long SleepingEntityList;
     [FieldOffset(0xA40)] public long SleepingEntityCount;
     [FieldOffset(0xC08)] public TerrainData Terrain;
-    [FieldOffset(0x11C)] public long LabDataPtr;   // NOT MEASURED - see below
+    [FieldOffset(0x48)]  public long LabDataPtr;
 }
 ```
 
-Every number above except `LabDataPtr` was **measured against the running client**, not carried
+Every number above was **measured against the running client**, not carried
 over from the reference distribution. The method is the one this repository uses for every
 offset, and it is worth stating because it is what makes the numbers claims rather than guesses:
 
@@ -73,11 +73,20 @@ the same process, so all of this proves *this fork reads what the reference read
 the layout of the game's own struct*. And `tools/parity.sh` is no help here at all: it counts
 **names** on the reference's API surface and never checks a single number.
 
-`LabDataPtr` is the one field left standing on an old build's number, and it is marked as such
-in the source. The character was not in the Labyrinth, so the reference reported `null` and
-there was no address to search for; the fallback hypothesis (the reference declares this field
-immediately before `CurrentArea`) does not hold either, because the matching place here holds
-something that is not a pointer at all.
+`LabDataPtr` was measured **without the oracle**, and it is the most instructive number here: the
+reference reports `LabyrinthData` as `null` even while the character stands inside the Labyrinth.
+The reference is right about the fields its own users exercise, and this is not one of them, so
+"ask the reference" is a working assumption rather than a law. It was found by *difference*
+instead - the head of the object is a run of zeroes outside the Labyrinth, and inside it exactly
+one qword in that run becomes a heap pointer - and confirmed by *content*: the reference's own
+parser aimed at that address (`RefLive --as LabyrinthData <addr>`) reads out ten rooms of a
+coherent layout, with a `LinkedWith` graph that agrees in both directions, while the same parser
+aimed at `ServerData` or at `EntityList` reads zero rooms.
+
+Every offset above was then re-measured after a full client restart, in a fourth zone: `TheGame`
+moved from `0x44C0C092E80` to `0x5F4F6093300` and `IngameState` from `0x44C17002C10` to
+`0x5F4FC562810`, a different address space entirely, and every number came out the same. ASLR is
+covered.
 
 > **The reference's own numbers do not transfer.** Its `IngameDataOffsets` declares
 > `LocalPlayer` and `EntityList` 8 bytes apart; on this client they are `0xB8` apart. What
