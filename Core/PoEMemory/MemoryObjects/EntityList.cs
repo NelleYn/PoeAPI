@@ -37,6 +37,11 @@ namespace ExileCore.PoEMemory.MemoryObjects
             var dataEntitiesCount = container.EntitiesCount();
             var parseServerEntities = container.ParseServer();
             double jobsTimeSum = 0;
+            // +0x8 is a field of the ENTITY LIST object, not of an entity: the root node of the node
+            // graph walked below. Inherited and not re-measured; it is left as a literal because
+            // there is no measured struct for this object to hold it, and inventing a named constant
+            // would dress an unmeasured number as a measured one. The other literals in this file
+            // (0x100000000 / 0x7F0000000000) are the node walk's plausibility window, also inherited.
             var addr = M.Read<long>(Address + 0x8);
             hashAddresses.Clear();
             hashSet.Clear();
@@ -47,7 +52,13 @@ namespace ExileCore.PoEMemory.MemoryObjects
             queue.Enqueue(node.SecondAddr);
             var loopcount = 0;
 
-            while (queue.Count > 0 && loopcount < 10000)
+            // Hard ceiling on the walk. A corrupted or stale node graph can link back into itself in
+            // ways the visited set does not catch, and an unbounded walk over foreign pointers is how
+            // this process runs away. 10000 nodes is far past any measured zone (132-142 entities on
+            // 2026-09-16), so reaching it is a fault, not a big zone — hence the log below.
+            const int maxNodes = 10000;
+
+            while (queue.Count > 0 && loopcount < maxNodes)
             {
                 try
                 {
@@ -61,12 +72,19 @@ namespace ExileCore.PoEMemory.MemoryObjects
 
                     if (nextAddr != addr && nextAddr != 0)
                     {
+                        // READ THE NODE FIRST, THEN TAKE ITS ENTITY. The two lines used to be the
+                        // other way round, which harvested the entity of the PREVIOUS node on every
+                        // iteration: the root sentinel's entity was collected (it is not an entity),
+                        // and the last node's entity was never collected at all, because the loop
+                        // ended before the iteration that would have taken it. Established by reading
+                        // the code, not by measurement — the off-by-one is in the order of these two
+                        // statements and needs no client to see.
+                        node = M.Read<EntityListOffsets>(nextAddr);
                         var entityAddress = node.Entity;
 
                         if (entityAddress > 0x100000000 && entityAddress < 0x7F0000000000)
                             hashAddresses.Add(entityAddress);
 
-                        node = M.Read<EntityListOffsets>(nextAddr);
                         queue.Enqueue(node.FirstAddr);
                         queue.Enqueue(node.SecondAddr);
                     }
@@ -75,6 +93,15 @@ namespace ExileCore.PoEMemory.MemoryObjects
                 {
                     DebugWindow.LogError($"Entitylist while loop: {e}");
                 }
+            }
+
+            // A limit that trips silently is a limit nobody knows about. This says so exactly once
+            // per collection pass, with the numbers needed to tell a runaway from a real crowd.
+            if (loopcount >= maxNodes)
+            {
+                DebugWindow.LogError(
+                    $"{nameof(EntityList)}: node walk hit its {maxNodes} node limit with {queue.Count} still queued " +
+                    $"and {hashAddresses.Count} entities collected - the list is looping or the offsets are stale.");
             }
 
             EntitiesProcessed = hashAddresses.Count;
@@ -253,7 +280,14 @@ namespace ExileCore.PoEMemory.MemoryObjects
         private uint ParseEntity(long addrEntity, Dictionary<uint, Entity> entityCache, uint entitiesVersion, Stack<Entity> result,
             bool parseServerEntities)
         {
-            var entityId = M.Read<uint>(addrEntity + 0x50);
+            // THE OFFSET COMES FROM THE STRUCT, NEVER FROM A LITERAL. This read happens before any
+            // Entity object exists, so it cannot go through EntityOffsets.Id — but it must be the
+            // SAME number. It was 0x50 while Entity.Id read 0x88, and the two can then never agree:
+            // Entity.Check(entityId) compares them, fails for every entity without exception, and the
+            // engine's entity list stays empty forever while every other number in the model is
+            // correct. That failure is invisible from the outside, which is why the constant is
+            // mandatory here.
+            var entityId = M.Read<uint>(addrEntity + EntityOffsets.IdOffset);
             if (entityId <= 0) return 0;
 
             if (entityId >= int.MaxValue && !parseServerEntities)
