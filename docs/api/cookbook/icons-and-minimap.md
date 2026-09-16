@@ -267,7 +267,11 @@ map is closed.
   `Translate(dx, dy, dz)` extension (`Core/Shared/Helpers/MathHepler.cs`).
 - `Render.Bounds` (SharpDX `Vector3`) for the model's size, to lift the bar above the model.
 - `Entity.GetComponent<Life>()` → `HPPercentage`, `ESPercentage`, `CurHP`/`MaxHP`,
-  `CurES`/`MaxES`.
+  `CurES`/`MaxES`. **On the 2026-09-16 build `HPPercentage` is `float.NaN`** — the reservation
+  offsets are unmeasured, so the unreserved denominator is unknown. A width computed from it comes
+  out `NaN` and the bar does not draw. Use `HPPercentageOfTotal` (`CurHP / MaxHP`, measured and
+  finite) in the snippet below, and see [components-combat.md](../components-combat.md) for what it
+  does and does not mean. `ESPercentage` is finite.
 
 ```csharp
 using SharpDX;
@@ -286,7 +290,8 @@ float w = 100f, h = 12f;
 var bar = new RectangleF(screen.X - w / 2f, screen.Y - h / 2f, w, h);
 
 Graphics.DrawBox(bar, Color.Black);                                   // background
-Graphics.DrawImage("healthbar.png", bar with { Width = w * life.HPPercentage }, Color.Red);
+// HPPercentageOfTotal, not HPPercentage: the latter is NaN on this build (see above).
+Graphics.DrawImage("healthbar.png", bar with { Width = w * life.HPPercentageOfTotal }, Color.Red);
 var esW = w * life.ESPercentage;
 Graphics.DrawImage("healthbar.png", new RectangleF(bar.X, bar.Y, esW, h * 0.3f), Color.Cyan);
 Graphics.DrawFrame(bar, Color.White, 1);

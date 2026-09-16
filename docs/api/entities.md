@@ -44,6 +44,19 @@ the backing `Address`.
 | `IsOpened` | `bool` | For chests: open or no longer targetable. |
 | `IsHidden` | `bool` | Cached; true when a monster has the `hidden_monster` buff. |
 
+> **Which of these stand on measured offsets (2026-09-16 build).** `Path`, `Metadata` and `Id` do:
+> the path pair passed a length criterion on 141 entities out of 141, and `Id` sits at `entity+0x88`.
+> So do the component reads behind `GridPos`, `Pos`, `RenderName` and `IsAlive`/`IsDead`.
+> **`InventoryId` does not.** The offset the fork reads it from (`entity+0x70`) was *refuted* on the
+> live client - on one chest that qword is a pointer into the game module, and reading it as a
+> `uint32` returns the pointer's low half - and no replacement has been found, so the value this
+> property returns is not to be trusted on this build. `IsHostile` reads `Positioned.Reaction`,
+> whose offset has not been measured either: a later pass narrowed it to three candidate bytes in
+> one qword (`+0x1E0`, `+0x1E2`, `+0x1E3`) but could not choose between them, because telling a
+> hostility flag from a faction number needs an **allied monster** and the measured zone had none.
+> Until that is settled, `IsHostile` is reading an inherited offset. Counts, criteria and everything
+> still open are in [entities-measured.md](entities-measured.md).
+
 ### Position, distance & display
 
 | Member | Type | Source component | Notes |
@@ -82,6 +95,42 @@ entity is not valid. Vector types here are SharpDX (`SharpDX.Vector2/Vector3`).
 `GetHudComponent<T>()` / `SetHudComponent<T>()` are *not* memory components: they
 are a per-entity scratch dictionary that lets a plugin stash its own computed
 object on an entity and read it back later (e.g. a cached render label).
+
+> **How a component is found on this build - not by name.** There are no component name strings in
+> the client's memory to compare `typeof(T).Name` against, and the doubly linked list of
+> `{Next, Prev, String, ComponentList}` nodes this fork used to walk is not there either (survey,
+> 2026-09-16). What is there is a table of fixed 8-byte slots hanging off the shared `EntityDetails`
+> object, and a slot only yields an **index** into the entity's own component pointer array. The
+> numeric id in the slot is **not** a component type id - it was measured ambiguous in both
+> directions - so a component's type has to be recognised by the component's **own vtable**, checked
+> against a measured `type -> RVA` table. That model was cross-checked against the direct
+> `Positioned` pointer the entity carries and agreed 50 times out of 50. The numeric id was a
+> **proposal** in the survey of the same day, never a table in this repository - there is no
+> `GameOffsets/ComponentNameIds.cs` in the tree or anywhere in its history - and the measurement
+> refuted it before it could become one. What the measurement did displace *from the code* is the
+> `NativeListNodeComponent` walk, whose file it deleted. See
+> [entities-measured.md](entities-measured.md); a component type absent from the measured table
+> cannot be recognised at all, which is the honest meaning of `GetComponent<T>()` returning `null`
+> for it.
+>
+> **The measurement behind that table stands at 40 `type -> RVA` pairs** - 30 on zone entities,
+> 9 item-side components, and `Projectile`, which is held on weaker evidence than the rest - joined
+> **by component address** across four passes of one day (the measured zone, dropped items, a fight,
+> a town). Every name has exactly one RVA. `GameOffsets/ComponentVtables.cs` is where a pair takes
+> effect, so check its `MeasuredPairs` for what this build actually recognises. Types the fork asks
+> for that are **not** in it - among them `Shrine`, `Monolith`, `Charges`, `Flask`, `Map`,
+> `SkillGem`, `TimerComponent` - return `null` from `GetComponent<T>()` **whatever the entity
+> actually carries**. They are unmeasured, not absent: no entity of the right kind was present in
+> the passes that were taken.
+>
+> Two cautions on the newly measured half. The item-side components (`Base`, `Mods`, `Sockets`,
+> `Quality`, `Stack`, `RenderItem`, `Weapon`, `Armour`, `LocalStats`) do not live on the ground
+> entity at all: they sit on the **item entity**, which has its own entity vtable (`0x35E0358`, not
+> the ground `0x3456508`) and is reached through `WorldItem.ItemEntity` - a path now measured at
+> `WorldItem + 0x28`, 14 items out of 14. And one vtable was deliberately **left out** of the table:
+> `0x35DFB80`, which the oracle names `AttributeRequirements` on armour and weapons but `Usable` on
+> currency. One vtable is one type, so one of those names is wrong; entering it would produce a
+> false-positive `HasComponent`, and this fork has no `Usable` class to lose.
 
 > Note: this fork does **not** define a `TryGetComponent<T>(out T)` accessor on
 > `Entity` (some upstream-targeting plugins call it). The idiomatic pattern here
@@ -168,6 +217,17 @@ first few values (`Error`, `None`, `ServerObject`, `Effect`, `Light`) are
 `Terrain`, `MiscellaneousObjects`). This `>= 100` boundary is exactly what gates
 the `EntityAdded` hook above. For the full list and every other framework enum,
 see [enums.md](enums.md).
+
+> **Not every `EntityType` value is reachable on this build, and that is a measurement gap, not a
+> rule of the game.** `Entity.ParseType` decides most types by asking for a component, so a type
+> whose gating component has no measured vtable can never be returned. As of the 2026-09-16 pass,
+> `MinimapIcon`, `AreaTransition` and `HideoutDoodad` **are** measured, which makes
+> `EntityType.AreaTransition`, `Waypoint`, `IngameIcon` and `HideoutDecoration` reachable - the whole
+> `MinimapIcon` branch was dead before, since every case inside it sits behind
+> `HasComponent<MinimapIcon>()`. The town pass added `Portal` and `NPC`, which makes
+> `EntityType.Portal` / `TownPortal` and `Npc` reachable too. Still unreachable for the same reason:
+> `Shrine` (needs `Shrine`) and `Monolith` (needs `Monolith`) - no zone with a shrine has been
+> measured yet. See [entities-measured.md](entities-measured.md).
 
 ## Examples
 

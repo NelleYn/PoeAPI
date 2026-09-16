@@ -25,6 +25,25 @@ if (entity.TryGetComponent<Stats>(out var stats) &&
 
 `GameStat`, `ActionFlags`, and `AnimationE` are enums — see [enums.md](enums.md).
 
+> **Which of these can be recognised at all on the 2026-09-16 build.** A component's type is told by
+> its own vtable, checked against a table of **40 measured `type -> RVA` pairs** (see
+> [entities-measured.md](entities-measured.md)). Of the components on this page the table covers
+> `Life`, `Stats`, `Actor`, `Player`, `Monster`, `Targetable`, `Pathfinding`, `StateMachine` and -
+> added by the combat pass of the same day - `DiesAfterTime`. It does **not** cover `Charges`,
+> `Flask`, `Magnetic`, `Beam` or `TimerComponent`, so `GetComponent<T>()` returns `null` for those
+> whatever the entity carries. Absent from the table means *unmeasured*, never *absent from the
+> entity*. A pair only takes effect once it is in `GameOffsets/ComponentVtables.cs`, so that array -
+> not this list - is what decides in the build you are running. `Buff` is not fetched as a component
+> at all - it comes off `Life.Buffs` - and the `Buffs` component, whose vtable *is* in the table, is
+> a shim that returns that same list.
+>
+> `Projectile` is a special case and deliberately weaker than the rest: its vtable
+> (`0x35A0D10`) was **not** joined to a live oracle reading. The oracle never caught a projectile
+> alive in three attempts during one fight, so the name is attached through `nameId 0x1CA` from
+> another run plus the observation that this vtable appears **only** on
+> `Metadata/Projectiles/ImpactingSteelProjectile` and `...Secondary`. This fork has no `Projectile`
+> component class to ask for it anyway.
+
 ---
 
 ### Life
@@ -34,13 +53,15 @@ File: `Core/PoEMemory/Components/Life.cs`. Health, mana, energy shield, reservat
 | Property | Type | Note |
 | --- | --- | --- |
 | `CurHP` / `MaxHP` | `int` | Current / maximum life (`MaxHP` defaults to `1` when unread). |
-| `ReservedFlatHP` / `ReservedPercentHP` | `int` | Flat / percent life reserved. |
+| `ReservedFlatHP` / `ReservedPercentHP` | `int?` | Flat / percent life reserved — **`null` on this build**, where the offsets are unmeasured. `null` means "nobody found the field", a measured `0` would mean "the game reserves nothing". |
 | `CurMana` / `MaxMana` | `int` | Current / maximum mana. |
-| `ReservedFlatMana` / `ReservedPercentMana` | `int` | Flat / percent mana reserved. |
+| `ReservedFlatMana` / `ReservedPercentMana` | `int?` | Flat / percent mana reserved — **`null` on this build**, same reason. |
 | `CurES` / `MaxES` | `int` | Current / maximum energy shield. |
-| `HPPercentage` | `float` | Current life as a fraction of *unreserved* max life. |
-| `MPPercentage` | `float` | Current mana as a fraction of *unreserved* max mana. |
-| `ESPercentage` | `float` | `CurES / MaxES`, or `0` when `MaxES == 0`. |
+| `ReservationsMeasured` | `bool` | **`false` on this build.** Read it before trusting the two fractions below. |
+| `HPPercentage` | `float` | Current life as a fraction of *unreserved* max life — **`float.NaN`** while `ReservationsMeasured` is `false`, because the denominator is unknown. Every comparison against NaN is false, so a gate written as `if (HPPercentage < x)` does not fire instead of firing on a fabricated number. |
+| `MPPercentage` | `float` | Current mana as a fraction of *unreserved* max mana — **`float.NaN`** on this build, same reason. |
+| `HPPercentageOfTotal` / `MPPercentageOfTotal` | `float` | `Cur / Max` of two **measured** fields, always finite. This is the fraction of the TOTAL pool, not of the unreserved one; reserved life or mana can only shrink the real denominator, so these are a **lower bound** on the two above — safe for "is it above X", unsafe for "is it below X". |
+| `ESPercentage` | `float` | `CurES / MaxES`, or `0` when `MaxES == 0`. Finite always: energy shield carries no reservation term here. |
 | `Buffs` | `List<Buff>` | Buffs/debuffs currently on the entity (per-frame cached). |
 | `OwnerAddress` | `long` | Owning entity address. |
 
@@ -53,6 +74,23 @@ There is no `Health`/`EnergyShield`/`Mana` aggregate sub-object; use the flat `C
 entity.TryGetComponent<Life>(out var life);
 var text = $"Life:{life?.MaxHP:#,##0} / ES:{life?.MaxES:#,##0} / Mana:{life?.MaxMana:#,##0}";
 ```
+
+> **Which of these stand on measured offsets (2026-09-16 build).** The three pools do, and they were
+> confirmed the strongest way available: the component holds three blocks - health at `0x180` with
+> max/current at `0x1A4`/`0x1A8`, mana at `0x1D0` with `0x1F4`/`0x1F8`, energy shield at `0x218` with
+> `0x23C`/`0x240` - each block's head qword points **at the component itself**, and the values they
+> produce agree with a fact known outside memory: on a Chaos Inoculation character they read
+> HP 1/1, mana 1135/67, ES 10353/10353. The step between blocks is `0x50` and then `0x48`, so
+> nothing here may be extrapolated from a neighbour. **Not measured on this build:** the
+> `Reserved*` fields and the `Buffs` list (`HasBuff`, `ParseBuffs`, and so `Entity.IsHidden`).
+> See [entities-measured.md](entities-measured.md).
+>
+> On the mana figure specifically: `1135/67` is one reading, and a **later read in the same session
+> gave `1135/1135`**. Both are measurements; *why* the first was low is not. Spending, regeneration
+> and a reserved pool all produce it, and nothing in this component tells them apart - so treat any
+> explanation of it, reservation included, as a hypothesis. It is not evidence about how far
+> `MPPercentage` and `MPPercentageOfTotal` diverge on a given character; that distance is exactly
+> what is unmeasured here.
 
 ### Buff
 
@@ -170,6 +208,12 @@ File: `Core/PoEMemory/Components/StateMachine.cs`. Targeting state from the enti
 
 > This component does **not** expose a `States` / `StateMachine` list — only the two targeting flags above.
 
+> Its vtable was measured on 2026-09-16 (`0x35DA8B8`), so the component is *recognised* on this
+> build; the offsets behind `CanBeTarget` and `InTarget` were not measured and are carried over.
+> Two lookup ids, `0x156` and `0x256`, lead to this one vtable — one of **five** names now known to
+> carry two ids exactly `0x100` apart, the others being `BaseEvents`, `InteractionAction` and, from
+> the combat pass, `Positioned` and `Life` (see [entities-measured.md](entities-measured.md)).
+
 ### Charges
 
 File: `Core/PoEMemory/Components/Charges.cs`. Charge state of a flask or other charge-using item.
@@ -199,6 +243,8 @@ File: `Core/PoEMemory/Components/Targetable.cs`. Whether the entity is targetabl
 ### DiesAfterTime
 
 File: `Core/PoEMemory/Components/DiesAfterTime.cs`. Empty marker component — present on entities that are destroyed after a period of time (e.g. temporary summons). No public members. Pair with `TimerComponent` for the remaining time.
+
+> Its vtable (`0x359F478`) was measured in the combat pass of 2026-09-16, and for a marker component that is the whole of it: the type has no fields, so "the entity has one" is all there is to read. It came out identically in two separate runs. `TimerComponent` remains unmeasured, so the pairing above still cannot be done on this build.
 
 ### Magnetic
 
@@ -239,6 +285,10 @@ File: `Core/PoEMemory/Components/Pathfinding.cs`. Movement / pathfinding state.
 | `StayTime` | `float` | Time spent stationary at the current position. |
 
 > Members are `TargetMovePos` / `PreviousMovePos` / `WantMoveToPosition` / `IsMoving` / `StayTime` — there is no `StayPositions` or `WasInArea` member. Note the capitalized `IsMoving` here vs. the lowercase `isMoving` on `Actor`.
+
+> Only this component's **vtable** was measured on 2026-09-16 (`0x35A6BA0`), which is what lets it be
+> recognised. Every offset in the table above is carried over from the reference: reading
+> `Pathfinding` fields was deliberately left outside that pass.
 
 ```csharp
 // adapted from Where-Are-You-Going

@@ -78,10 +78,14 @@ private bool ReadPlayerState()
     var life = player.GetComponent<Life>();
     if (life == null || life.CurHP <= 0) return false;  // dead -> skip
 
-    // Pools as 0..100 percentages. HPPercentage/MPPercentage are fractions of *unreserved* max.
-    _hpPct = life.HPPercentage * 100f;                  // Life.HPPercentage
-    _mpPct = life.MPPercentage * 100f;                  // Life.MPPercentage
-    _esPct = life.ESPercentage * 100f;                  // 0 when MaxES == 0
+    // Pools as 0..100 percentages. HPPercentage/MPPercentage are fractions of *unreserved* max,
+    // and on the 2026-09-16 build they are float.NaN — the reservation offsets are unmeasured, so
+    // the denominator is unknown (life.ReservationsMeasured is false). Every comparison against NaN
+    // is false, so a gate written over these does not fire at all. Use *PercentageOfTotal for a
+    // finite number and read what it means first: components-combat.md.
+    _hpPct = life.HPPercentage * 100f;                  // NaN on this build
+    _mpPct = life.MPPercentage * 100f;                  // NaN on this build
+    _esPct = life.ESPercentage * 100f;                  // finite; 0 when MaxES == 0
 
     // Buffs live on Life in this fork (NOT a Buffs component). Cached per-frame internally.
     _buffs = life.Buffs;                                 // List<Buff>; or player.Buffs
@@ -299,6 +303,9 @@ public sealed class PlayerSnapshot
         if (life == null) return null;
         return new PlayerSnapshot
         {
+            // NaN on the 2026-09-16 build; every rule reading them evaluates false. Swap in
+            // HPPercentageOfTotal / MPPercentageOfTotal if the rules must fire, and note that those
+            // are fractions of the TOTAL pool, a lower bound on the unreserved one.
             HpPercent   = life.HPPercentage * 100f,
             EsPercent   = life.ESPercentage * 100f,
             ManaPercent = life.MPPercentage * 100f,
@@ -373,7 +380,7 @@ private bool CanPressKey() =>
 | Need | Fork member | File |
 | --- | --- | --- |
 | Local player entity | `GameController.Player` (== `IngameState.Data.LocalPlayer`) | `Core/GameController.cs`, `Core/PoEMemory/MemoryObjects/IngameData.cs` |
-| HP/ES/Mana % | `Life.HPPercentage` / `ESPercentage` / `MPPercentage` | `Core/PoEMemory/Components/Life.cs` |
+| HP/ES/Mana % | `Life.HPPercentage` / `ESPercentage` / `MPPercentage` — HP and mana are **`NaN` on the 2026-09-16 build** (unmeasured reservations); `HPPercentageOfTotal` / `MPPercentageOfTotal` are the finite, measured fractions of the *total* pool | `Core/PoEMemory/Components/Life.cs` |
 | Raw pools | `Life.CurHP`/`MaxHP`, `CurES`/`MaxES`, `CurMana`/`MaxMana` | `Core/PoEMemory/Components/Life.cs` |
 | Has a buff | `Life.HasBuff(string)` | `Core/PoEMemory/Components/Life.cs` |
 | Buff list | `Life.Buffs` (or `Entity.Buffs`) | `Life.cs`, `Core/PoEMemory/MemoryObjects/Entity.cs` |

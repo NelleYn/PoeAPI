@@ -27,6 +27,32 @@ helper types live in `ExileCore.PoEMemory.MemoryObjects`). Each derives from `Co
 > part of this API. The members documented here are the raw ExileCore surface those helpers
 > are built on.
 
+> **Almost none of the field offsets on this page have been measured against the 2026-09-16 build** -
+> they are carried over and unverified. The **one exception** is `WorldItem`'s single field, and the
+> rest of what was measured item-side is which components can be *recognised* at all. A component's
+> type is told by its own vtable (see [entities-measured.md](entities-measured.md)), and the table
+> now covers `WorldItem`, `ObjectMagicProperties`, `Inventories` **and the item-side components** -
+> `Base`, `Mods`, `Sockets`, `Quality`, `Stack`, `RenderItem`, `Weapon`, `Armour` and `LocalStats`
+> (which this fork has no class for). Still missing from it: `Map`, `SkillGem`, `Charges`, `Flask`
+> and `CurrencyInfo`. Missing from the table means *unmeasured*, never *absent from the entity*, and
+> a pair only takes effect once it is in `GameOffsets/ComponentVtables.cs`.
+>
+> **Where the item components live, now measured rather than assumed.** They are not on the entity a
+> zone scan walks. A dropped item is a ground-container entity carrying `WorldItem`; the item itself
+> is a **second entity** with its own entity vtable (`0x35E0358`, not the ground `0x3456508`), which
+> is why a search keyed on the ground vtable never found it. The path to it is `WorldItem + 0x28`,
+> **measured on 14 dropped items out of 14** - currency, a divination card, boots, an axe, a staff,
+> a claw, a helmet - and confirmed by shape: neighbouring `WorldItem` components are `0xD0` apart, so
+> the same field turns up again at `+0xF8` and `+0x1C8`, which are the neighbours rather than other
+> fields. `Core/PoEMemory/Components/WorldItem.cs` has always read `Address + 0x28`, inherited from
+> upstream; what changed is that the number is now measured instead of taken on trust.
+>
+> One vtable seen on items was deliberately **not** entered: `0x35DFB80`, which the oracle names
+> `AttributeRequirements` on armour and weapons but `Usable` on currency. A vtable is a type, so one
+> of the two names is wrong and nothing on hand says which; entering it would hand out a
+> false-positive `HasComponent`. This fork has no `Usable` class, so the omission costs nothing and
+> `AttributeRequirements` stays unresolvable.
+
 ---
 
 ### Base
@@ -257,10 +283,16 @@ entity. See [components-world.md](components-world.md) for other ground-object c
 
 | Property | Type | Note |
 | --- | --- | --- |
-| `ItemEntity` | `Entity` | The dropped item's entity (per-frame cached). |
+| `ItemEntity` | `Entity` | The dropped item's entity (per-frame cached). Read from **`WorldItem + 0x28`** — **measured**, 14 dropped items out of 14. |
 
 Usage: on a labelled ground item, `groundEntity.GetComponent<WorldItem>().ItemEntity` gives
 the item entity you then read `Base`/`Mods`/`Sockets` from.
+
+> `+0x28` is the only offset on this page that is a measurement. It was inherited from upstream and
+> the code did not change; the measurement is the provenance it lacked. Shape backs it up:
+> neighbouring `WorldItem` components sit `0xD0` apart, so the same field reappears at `+0xF8` and
+> `+0x1C8` — those are the adjacent components, not other fields. The entity it points at carries its
+> own vtable, `0x35E0358`.
 
 ---
 

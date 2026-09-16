@@ -166,6 +166,23 @@ separately) in which the symbol appears.
 | `GetComponent<Render Item / Stack / Quality / Weapon / Armour / Sockets / SkillGem>` | 2–4 | GCV (item-pricing), GIWL, PickItV2 |
 | `GetComponent<Player>` / `Monster` / `Targetable` / `Actor` / `Charges` | 1–5 | ReAgent, Beasts, PickItV2, Character-Data, WAYG |
 
+> **This table counts what plugins *ask for*, not what the fork can *resolve* on the 2026-09-16
+> build — and the two still differ, though by less than they did.** A component is recognised by its
+> own vtable against a table of **40 measured `type -> RVA` pairs** (the older model, matching a name
+> string or the lookup table's numeric id, was refuted by measurement; see
+> [entities-measured.md](entities-measured.md)). Of the accessors above, `Mods` (13 repos) and `Base`
+> (12 repos) **are now in the table**, as are `RenderItem`, `Stack`, `Quality`, `Weapon`, `Armour`
+> and `Sockets` — they were harvested from the **item entity** behind `WorldItem.ItemEntity`, whose
+> path (`WorldItem + 0x28`) is itself now measured. Still **not** in the table, and so still `null`
+> from `GetComponent<T>()` whatever the entity carries: `SkillGem`, `Flask`, `Charges`, `Map`,
+> `Shrine` and `Monolith`. `Render`, `Positioned`, `WorldItem`, `ObjectMagicProperties`, `Life`,
+> `Animated`, `StateMachine`, `Stats`, `Player`, `Monster`, `Targetable`, `Actor`, `Portal` and
+> `NPC` **are** in the table. `MeasuredPairs` in `GameOffsets/ComponentVtables.cs` is the list that
+> actually decides — a pair that has not been entered there yet resolves nothing, however well it is
+> measured. Recognition is also all that was bought: apart from `WorldItem + 0x28`, every field
+> offset behind these accessors is still carried over. Unmeasured is not the same as absent, and
+> neither is the same as undocumented.
+
 ### IngameState / UI tree
 
 | Symbol | #repos | Used by (sample) |
@@ -239,6 +256,12 @@ separately) in which the symbol appears.
 
 For each heavily-used symbol the audit confirmed both **(a)** presence in this fork's
 `Core` source and **(b)** coverage in a `docs/api/*.md` file. All checks below passed.
+
+Both checks are about the **API surface**: a `✓` says the symbol exists and is documented, not that
+it returns data on the current game build. For components that is a live distinction — several rows
+below name types whose vtable has not been measured, so they resolve to `null` on the 2026-09-16
+build (see the note under [Entity & components](#entity--components) and
+[entities-measured.md](entities-measured.md)).
 
 | Symbol / area | In this fork's `Core`? | Documented in | Verified |
 |---|---|---|---|
@@ -367,7 +390,10 @@ renders as an `InputText`, which `ContentNode<TextNode>` needs anyway.
 
 All are offset-bearing memory components, and the reconstruction's offsets target client 328.8
 (its `ModsComponentOffsets.implicitMods` is `0xC0` where this fork's is `0x90`), so they cannot be
-ported as literals — each needs an offset dumped against the client this fork targets.
+ported as literals — each needs an offset dumped against the client this fork targets. Since
+2026-09-16 each also needs its **own vtable RVA** measured: that, and not a name or a lookup id, is
+what identifies a component on this build, so adding the class and its offsets without the vtable
+produces a component that can never be found. See [entities-measured.md](entities-measured.md).
 
 #### Still open — `IngameUi` members
 

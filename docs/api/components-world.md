@@ -59,6 +59,25 @@ Usage: `var r = player.GetComponent<Render>(); var world = new Vector3(r.Pos.X, 
 
 > Some downstream plugin forks rename these to `GridPosNum` / `PosNum` / `BoundsNum`. This repo exposes the names above (`GridPos`, `Pos`, `Bounds`).
 
+> **Which of these stand on measured offsets (2026-09-16 build).** Measured on the live client and
+> confirmed by content: `GridX`/`GridY` (at `0x294`/`0x298`, and read as **`int32`** - the
+> `world / grid` ratio only converges when they are, which is what makes the type part of the
+> measurement), the world position behind `WorldX`/`WorldY`/`WorldPos` (`0x2B8`, and equal to
+> `Render.Pos` on X and Y), `Render.Pos` (`0x120`), `Render.Bounds` (`0x12C`) and `Render.Name`
+> (`0x148`, an embedded UTF-16 text with its length at `0x158` and capacity at `0x160`; short
+> strings live inside the object, long ones behind a pointer in the same bytes).
+> **Not measured on this build**, so read with suspicion: `Reaction` (and therefore
+> `Entity.IsHostile`), `Rotation`/`RotationDeg`, `GridPosition`, `Height`, `TerrainHeight` and
+> `MeshRoration`. Counts and criteria: [entities-measured.md](entities-measured.md).
+>
+> `Reaction` in particular is **narrowed but not settled**, and the offset in the struct is still the
+> inherited one. Three bytes of one qword are candidates: `+0x1E0` and `+0x1E2` read 1 on the player
+> and the pet and 0 on all thirteen monsters - which matches what the reference reports, 1 for the
+> player and 0 for a monster - while `+0x1E3` reads player 1, pet 1, monsters 2, chests and items 3,
+> Terrain 3, `AreaTransition` and the waypoint 5, effects 255, doodads 1. The first pair behaves like
+> a hostility flag and the third like a faction number, and only an **allied monster** separates
+> those two readings; the measured zone had none. Do not treat any of the three as the field.
+
 ### Animated
 
 File: `Core/PoEMemory/Components/Animated.cs`. Bridges an animated in-game object to the entity backing its animation.
@@ -72,6 +91,24 @@ Usage: `entity.GetComponent<Animated>()?.BaseAnimatedObjectEntity` to reach the 
 ---
 
 ## Interactables
+
+> **Which of these can be recognised at all on the 2026-09-16 build.** A component's type is told by
+> its own vtable, checked against a table of **40 measured `type -> RVA` pairs**. Of the components
+> below the table covers `Chest`, `Transitionable`, `AreaTransition`, `TriggerableBlockage`,
+> `Portal` and `NPC`, and further down the page `MinimapIcon` and `HideoutDoodad` (it also covers
+> `Positioned`, `Render` and `Animated` above, `Targetable` and `StateMachine` on the combat page,
+> and `InteractionAction`, which this fork does not model at all). `AreaTransition`,
+> `TriggerableBlockage`, `MinimapIcon` and `HideoutDoodad` came from the later harvest of the same
+> day; `Portal` and `NPC` came from the town pass after it. `MinimapIcon` is the consequential one,
+> because `Entity.ParseType` gates a whole branch of the classification on it. A pair takes
+> effect only once it is in `GameOffsets/ComponentVtables.cs`, so that array is what to check before
+> concluding a component is or is not resolvable today.
+> `Shrine` and `Monolith` are **not** in the table - no zone with a shrine has been measured - so
+> nothing built on it finds them yet. And recognition is all that was measured: **every field offset
+> on this page is carried over and unmeasured**, including the fields of the components just added -
+> having a component's vtable buys the right to say "this entity has one", nothing about what is
+> inside it. Absent from the table means *unmeasured*, never *absent from the entity*. See
+> [entities-measured.md](entities-measured.md).
 
 ### Chest
 

@@ -365,6 +365,10 @@ Key components expanded:
 `MaxMana`/`CurMana`/`ReservedFlatMana`/`ReservedPercentMana`/`ManaRegen`, `MaxES`/`CurES`;
 computed `HPPercentage`/`MPPercentage`/`ESPercentage`; `List<Buff> Buffs`;
 `bool HasBuff(string buff)`.
+*This fork diverges here:* the reservation offsets are unmeasured on the 2026-09-16 build, so the
+four `Reserved*` members are `int?` and always `null`, `HPPercentage`/`MPPercentage` are
+`float.NaN`, the regen members are gone, and `HPPercentageOfTotal`/`MPPercentageOfTotal` are added
+for callers that need a finite number. See [components-combat.md](components-combat.md).
 
 **`Actor`** (◑): `short ActionId`; `ActionFlags Action`; `bool isMoving`/`isAttacking`;
 `int AnimationId`; `AnimationE Animation`; `ActionWrapper CurrentAction`;
