@@ -110,10 +110,11 @@ namespace GameOffsets
         /// What is still open is not whether this is the player, but whether this is THE field:
         /// two places in this object hold the same pointer, 0x970 and 0x10E8. This one is chosen
         /// because it is exactly <see cref="ServerData"/> + 8, reproducing both the order AND the
-        /// spacing the reference declares for these two fields, while 0x10E8 sits in an unrelated
-        /// run of floats and counters. That is an argument from structure. The two would be told
-        /// apart by a state in which they disagree — a loading screen or character select, where
-        /// one of them should go null first.
+        /// spacing the reference declares for these two fields. The other one has since been
+        /// identified rather than dismissed: 0x10E8 is field +0x30 of a sub-object with its own
+        /// vtable at Data + 0x10B8, the same sub-object <see cref="EnvironmentData"/> belongs to —
+        /// so it is a second owner's reference to the player, not the field itself. Chasing a state
+        /// where the two disagree is not worth a separate session.
         /// </para>
         /// </remarks>
         [FieldOffset(0x970)] public long LocalPlayer;
