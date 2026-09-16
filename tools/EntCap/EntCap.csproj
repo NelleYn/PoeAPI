@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    EntCap — атомарный снимок СЛОЯ СУЩНОСТЕЙ живого клиента. Этим инструментом сняты числа,
+    которыми закрыт слой сущностей и горячий путь (docs/api/entities-measured.md).
+
+    ЗАЧЕМ ОТДЕЛЬНЫЙ ИНСТРУМЕНТ, а не несколько вызовов FindOffset. Проверка гипотезы о раскладке
+    сущности требует десятка СОГЛАСОВАННЫХ чтений: Data -> EntityList -> обход дерева -> details
+    -> lookup -> слоты -> компоненты. Делать их отдельными запусками нельзя — в игру играет
+    человек, между двумя командами меняется зона, Data переезжает, и старый адрес указывает в
+    чужую память. Это не теория: первая же попытка мерить так дала дамп Data+0xA28, целиком
+    состоящий из float. Здесь всё чтение идёт в ОДНОМ процессе, и снимок обрамлён проверкой
+    «зона и база Data не менялись» — если сменились, печатается НЕДЕЙСТВИТЕЛЕН и код возврата 3.
+
+    ТОЛЬКО ЧТЕНИЕ: процесс открывается с PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, ни одной
+    записи, ни ввода, ни инъекции.
+
+    НАМЕРЕННО БЕЗ ProjectReference, в отличие от FindOffset и SanityRead. Те обязаны читать
+    ИМЕННО нашими оффсетами, потому что проверяют их. Этот — наоборот: он должен уметь читать
+    ГИПОТЕЗУ, которой в коде ещё нет, и не должен ломаться от того, что код меняется под ним.
+    Поэтому все числа объявлены в нём же константами с пометкой, откуда они, а чтение идёт через
+    голый ReadProcessMemory.
+
+    НЕ входит в ExileApi.sln — как и остальные tools. Сборка и запуск:
+      dotnet build -c Release tools\EntCap\EntCap.csproj
+      tools\EntCap\bin\Release\net10.0\EntCap.exe (ключ igs = адрес IngameState, затем режим)
+    Адрес IngameState берётся у соседа:
+      tools\FindOffset\bin\Release\net10.0-windows\FindOffset.exe (ключ ingame-state)
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU;x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ExileApi.Tools.EntCap</RootNamespace>
+    <AssemblyName>EntCap</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+</Project>
