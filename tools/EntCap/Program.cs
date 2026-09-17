@@ -20,7 +20,7 @@
 //            запуска клиента (объект состояния), в отличие от Data, который переезжает со сменой зоны.
 //   --max    сколько сущностей разобрать подробно (по умолчанию 12).
 //   --slots  дополнительно печатать полный дамп слот-таблицы и вектора компонентов.
-//   --census <RVA vtable в HEX> [--census-bytes N]
+//   --census <RVA vtable в HEX> [--census-bytes N]   (N десятичное, либо с явным 0x)
 //            ПЕРЕПИСЬ поля по популяции: собрать этот компонент со ВСЕХ сущностей зоны и
 //            напечатать, какие байты строго булевы и непостоянны, а какие постоянны по всей
 //            зоне. Ищет смещение признака вместо того, чтобы проверять подставленное.
@@ -90,8 +90,12 @@ internal static class Program
         _items = args.Contains("--items");
         _watch = int.TryParse(Arg(args, "--watch"), out var w) ? w : 0;
         if (TryHex(Arg(args, "--census") ?? "", out var cen)) _census = cen;
-        if (int.TryParse(Arg(args, "--census-bytes"), out var cb) && cb >= 0x20 && cb <= 0x800)
-            _censusBytes = cb;
+        // Десятичное, либо шестнадцатеричное с явным 0x. Раньше здесь был голый int.TryParse,
+        // а у соседнего --census — TryHex: два ключа одной команды читались в РАЗНЫХ системах
+        // счисления, и "--census-bytes 0x800" молча давал 256. Прогон получался не тот, который
+        // набрали, и вывод об этом не сообщал.
+        if (TryNum(Arg(args, "--census-bytes"), out var cb) && cb >= 0x20 && cb <= 0x2000)
+            _censusBytes = (int)cb;
         var max = int.TryParse(maxText, out var m) ? m : 12;
 
         if (igsText == null || !TryHex(igsText, out var igs))
@@ -499,14 +503,45 @@ internal static class Program
         }
 
         var kinds = comps.GroupBy(x => x.Kind).OrderByDescending(g => g.Count()).ToList();
-        Console.WriteLine($"  виды сущностей: " +
+        Console.WriteLine($"  виды сущностей (до отсева по чтению): " +
                           string.Join(", ", kinds.Select(g => $"{g.Key}={g.Count()}")));
         Console.WriteLine();
 
         // Читаем окно каждого компонента ОДНИМ чтением: перепись идёт по всей зоне, и экономия
         // на системных вызовах здесь же превращается в сокращение времени, за которое человек
         // может сменить зону под нами.
-        var windows = comps.Select(c => Raw(c.Comp, bytes)).ToList();
+        var windows = new List<byte[]>();
+        var dropped = 0;
+        var kept = new List<(long Comp, string Kind, long Ent)>();
+
+        foreach (var c in comps)
+        {
+            var win = RawExact(c.Comp, bytes, out var ok);
+            if (!ok)
+            {
+                dropped++;
+                continue;
+            }
+
+            windows.Add(win);
+            kept.Add(c);
+        }
+
+        comps = kept;
+
+        Console.WriteLine($"  носителей с ПОЛНЫМ чтением окна: {comps.Count}; " +
+                          $"исключено по неполному чтению: {dropped}");
+        if (dropped > 0)
+            Console.WriteLine("  (исключённые НЕ входят в числа ниже: окно из нулей неотличимо от честного" +
+                              " нулевого и способно само создать кандидата)");
+
+        if (comps.Count == 0)
+        {
+            Console.WriteLine("  ни одного носителя с полным чтением — перепись невозможна.");
+            return;
+        }
+
+        kinds = comps.GroupBy(x => x.Kind).OrderByDescending(g => g.Count()).ToList();
 
         Console.WriteLine("БАЙТОВЫЕ ПОЛЯ: какие смещения СТРОГО БУЛЕВЫ по всей популяции и при этом не постоянны");
         Console.WriteLine(new string('-', 100));
@@ -588,6 +623,49 @@ internal static class Program
 
         Console.WriteLine();
         Console.WriteLine($"  строго булевых и непостоянных байт: {printed} из {bytes}");
+        Console.WriteLine();
+
+        // ── Прогоны булевых байт: условие «ФОРМА» ───────────────────────────────────────────────
+        // Отдельное непостоянное булево поле — слабая улика: у мусорного байта есть шанс случайно
+        // принять только 0 и 1. Прогон из нескольких ПОДРЯД лежащих байт, каждый из которых на всей
+        // популяции принимает только 0 и 1, — улика совсем другой силы, и именно она проверяет
+        // гипотезу «блок полей уехал целиком». Здесь считаются и ПОСТОЯННЫЕ булевы тоже: поле
+        // «вечно ноль» всё равно часть блока, просто в этой зоне не сработавшая.
+        Console.WriteLine("ПРОГОНЫ ПОДРЯД ЛЕЖАЩИХ БУЛЕВЫХ БАЙТ (включая постоянные) — условие «форма»");
+        Console.WriteLine(new string('-', 100));
+
+        var runs = new List<(int Start, int Len)>();
+        var runStart = -1;
+
+        for (var off = 0; off <= bytes; off++)
+        {
+            var isBool = off < bytes && windows.All(win => win[off] <= 1);
+            if (isBool)
+            {
+                if (runStart < 0) runStart = off;
+                continue;
+            }
+
+            if (runStart >= 0 && off - runStart >= 3) runs.Add((runStart, off - runStart));
+            runStart = -1;
+        }
+
+        if (runs.Count == 0)
+        {
+            Console.WriteLine("  прогонов длиной от 3 байт нет.");
+        }
+        else
+        {
+            foreach (var r in runs.OrderByDescending(x => x.Len).Take(12))
+            {
+                var varying = Enumerable.Range(r.Start, r.Len)
+                    .Count(o => windows.Select(win => win[o]).Distinct().Count() > 1);
+                Console.WriteLine($"  +0x{r.Start:X2}..+0x{r.Start + r.Len - 1:X2}   длина {r.Len,3}   " +
+                                  $"из них непостоянных {varying}");
+            }
+
+            Console.WriteLine($"  всего прогонов от 3 байт: {runs.Count}");
+        }
         Console.WriteLine();
 
         // ── Малые целые: перечисления ───────────────────────────────────────────────────────────
@@ -1200,6 +1278,25 @@ internal static class Program
         return buffer;
     }
 
+    // То же чтение, но ЧЕСТНОЕ: говорит, прочиталось ли ровно столько, сколько просили.
+    //
+    // Зачем отдельная обёртка. Raw выше молча отдаёт буфер нулей при отказе ReadProcessMemory, и
+    // это ровно ловушка №2 промта («Read на мусорном адресе возвращает default, а не бросает»),
+    // только применённая к собственному инструменту. На коротком окне она почти не кусается; на
+    // длинном кусается обязательно, потому что чтение идёт всё-или-ничего: компонент у края
+    // отображённой страницы отдаст окно из нулей, и такой ФАЛЬШИВЫЙ носитель войдёт в популяцию
+    // как «всё нули». Он способен и создать булева кандидата там, где его нет, и испортить счёт
+    // «столько-то из стольких-то» — то есть испортить именно те числа, ради которых перепись.
+    private static byte[] RawExact(long address, int size, out bool ok)
+    {
+        var buffer = new byte[size];
+        ok = false;
+        if (address <= 0) return buffer;
+        if (!ReadProcessMemory(_handle, (IntPtr)address, buffer, size, out var read)) return buffer;
+        ok = read.ToInt64() == size;
+        return buffer;
+    }
+
     private static string ReadUtf16(long address, int chars)
     {
         if (chars <= 0 || chars > 512) return null;
@@ -1223,6 +1320,16 @@ internal static class Program
             if (string.Equals(args[i], key, StringComparison.OrdinalIgnoreCase))
                 return args[i + 1];
         return null;
+    }
+
+    // Десятичное по умолчанию, шестнадцатеричное — только с явным 0x. Намеренно НЕ TryHex:
+    // тот разбирает голые цифры как HEX, и "128" стало бы 296.
+    private static bool TryNum(string text, out long value)
+    {
+        value = 0;
+        if (string.IsNullOrEmpty(text)) return false;
+        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) return TryHex(text, out value);
+        return long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
     private static bool TryHex(string text, out long value)
