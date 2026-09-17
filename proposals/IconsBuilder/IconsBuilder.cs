@@ -1,4 +1,4 @@
-// EXPERIMENTAL candidate ported from exApiTools/IconsBuilder — see proposals/IconsBuilder/README.md. Not part of the build.
+﻿// EXPERIMENTAL candidate ported from exApiTools/IconsBuilder — see proposals/IconsBuilder/README.md. Not part of the build.
 
 using System;
 using System.Collections.Generic;
@@ -22,7 +22,12 @@ namespace ExileCore.IconsBuilder;
 /// </summary>
 public class IconsBuilder : BaseSettingsPlugin<IconsBuilderSettings>
 {
-    private readonly EntityType[] _chests = { EntityType.Chest, EntityType.SmallChest };
+    // EntityType.SmallChest was removed from the enum: it was one member more than the reference
+    // distribution has, which shifted 27 later members by one and made a plugin compiled against
+    // the reference misread every kind past Chest. Nothing ever produced the value —
+    // Entity.GetEntityType classifies small chests as Chest — so the array loses nothing.
+    // (ChestType.SmallChest, used below for icon selection, is a different enum and still exists.)
+    private readonly EntityType[] _chests = { EntityType.Chest };
 
     private readonly EntityType[] _skippedEntity =
     {

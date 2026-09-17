@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────────────────────────────────────────────────────────
 // EntCap — атомарный снимок СЛОЯ СУЩНОСТЕЙ живого клиента. ТОЛЬКО ЧТЕНИЕ.
 //
 // Зачем отдельный инструмент. Проверка гипотез о раскладке сущности требует десятка согласованных
@@ -20,6 +20,10 @@
 //            запуска клиента (объект состояния), в отличие от Data, который переезжает со сменой зоны.
 //   --max    сколько сущностей разобрать подробно (по умолчанию 12).
 //   --slots  дополнительно печатать полный дамп слот-таблицы и вектора компонентов.
+//   --census <RVA vtable в HEX> [--census-bytes N]
+//            ПЕРЕПИСЬ поля по популяции: собрать этот компонент со ВСЕХ сущностей зоны и
+//            напечатать, какие байты строго булевы и непостоянны, а какие постоянны по всей
+//            зоне. Ищет смещение признака вместо того, чтобы проверять подставленное.
 //
 // Коды возврата: 0 — снимок действителен; 2 — читать нечего; 3 — состояние сменилось посередине.
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -68,6 +72,8 @@ internal static class Program
     private static bool _posdump;
     private static bool _items;
     private static int _watch;
+    private static long _census = -1;
+    private static int _censusBytes = 0x100;
     private static long _moduleBase;
 
     private static int Main(string[] args)
@@ -83,6 +89,9 @@ internal static class Program
         _posdump = args.Contains("--posdump");
         _items = args.Contains("--items");
         _watch = int.TryParse(Arg(args, "--watch"), out var w) ? w : 0;
+        if (TryHex(Arg(args, "--census") ?? "", out var cen)) _census = cen;
+        if (int.TryParse(Arg(args, "--census-bytes"), out var cb) && cb >= 0x20 && cb <= 0x800)
+            _censusBytes = cb;
         var max = int.TryParse(maxText, out var m) ? m : 12;
 
         if (igsText == null || !TryHex(igsText, out var igs))
@@ -149,6 +158,26 @@ internal static class Program
         {
             Console.WriteLine("обход не дал ни одной сущности.");
             return ExitNothingToRead;
+        }
+
+        if (_census >= 0)
+        {
+            Census(entities, _census, _censusBytes);
+
+            // Рамка «после» — та же, что у остальных режимов: перепись идёт по всей зоне и стоит
+            // секунды, за которые человек успевает сменить зону.
+            var dAfter = Q(igs + IgsData);
+            var hAfter = IsPointer(dAfter) ? U32(dAfter + DataAreaHash) : 0;
+            Console.WriteLine();
+            if (data == dAfter && hashBefore == hAfter)
+            {
+                Console.WriteLine($"СНИМОК ДЕЙСТВИТЕЛЕН: зона и база Data не менялись (0x{hashBefore:X}, 0x{data:X})");
+                return ExitOk;
+            }
+
+            Console.WriteLine($"СНИМОК НЕДЕЙСТВИТЕЛЕН: было 0x{hashBefore:X}/0x{data:X}, " +
+                              $"стало 0x{hAfter:X}/0x{dAfter:X} — повторить, не используя числа выше.");
+            return ExitStale;
         }
 
         // ── Разбор сущностей ─────────────────────────────────────────────────────────────────────
@@ -402,6 +431,280 @@ internal static class Program
     // Обход дерева сущностей — ОДИН-В-ОДИН с Core/PoEMemory/MemoryObjects/EntityList.cs и с
     // tools/SanityRead, включая особенность, что node.Entity берётся от ПРЕДЫДУЩЕГО узла.
     // Повторено как есть намеренно: цифра должна совпадать с той, что получает сам форк.
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // ПЕРЕПИСЬ ПОЛЯ ПО ПОПУЛЯЦИИ. Не проверяет подставленное смещение, а ищет его.
+    //
+    // Приём описан в промте (пункт 3 «Порядок работ») и здесь реализован: поле, объявленное в
+    // структуре, но КОНСТАНТНОЕ по всей зоне или никогда не похожее на свой тип, почти наверняка
+    // читается не оттуда. Обратное тоже верно и полезнее: если ищут булев признак, то настоящее
+    // поле обязано быть строго булевым НА ВСЕЙ ПОПУЛЯЦИИ и обязано РАЗЛИЧАТЬ виды сущностей.
+    //
+    // Почему это сильнее оракула. Оракул отвечает про один адрес, и его ответ — выборка из одной
+    // сущности; ровно так «InventoryId +0x70» сошёлся на трёх и развалился на сорока. Перепись
+    // берёт все сущности зоны разом и отделяет поле, которое ВСЕГДА булево и при этом не
+    // постоянно, от сотни байт, которые случайно оказались нулём или единицей у первых трёх.
+    //
+    // Вид сущности — первые два сегмента пути метаданных (Metadata/Monsters, Metadata/Chests),
+    // как и в корреляции nameId ниже: иначе таблица распухает вариантами одного и того же.
+    private static void Census(List<long> entities, long vtableRva, int bytes)
+    {
+        Console.WriteLine($"ПЕРЕПИСЬ КОМПОНЕНТА ПО ПОПУЛЯЦИИ: vtable RVA 0x{vtableRva:X}, " +
+                          $"первые 0x{bytes:X} байт");
+        Console.WriteLine(new string('=', 100));
+
+        var comps = new List<(long Comp, string Kind, long Ent)>();
+
+        foreach (var ent in entities)
+        {
+            var first = Q(ent + EntComps);
+            var last = Q(ent + EntComps + 8);
+            if (!IsPointer(first) || last < first || last - first > 0x2000) continue;
+
+            long found = 0;
+            for (long i = 0; i < (last - first) / 8 && i < 256; i++)
+            {
+                var c = Q(first + i * 8);
+                if (!IsPointer(c)) continue;
+                if (Q(c) - _moduleBase != vtableRva) continue;
+                found = c;
+                break;
+            }
+
+            if (found == 0) continue;
+
+            var det = Q(ent + EntDetails);
+            var kind = "?";
+            if (IsPointer(det))
+            {
+                var ptr = Q(det + DetPathPtr);
+                var len = Q(det + DetPathLen);
+                if (IsPointer(ptr) && len > 0 && len <= 512)
+                {
+                    var path = ReadUtf16(ptr, (int)len);
+                    if (path != null) kind = string.Join("/", path.Split('/').Take(2));
+                }
+            }
+
+            comps.Add((found, kind, ent));
+        }
+
+        Console.WriteLine($"  сущностей в зоне {entities.Count}; несут этот компонент {comps.Count}");
+
+        if (comps.Count == 0)
+        {
+            Console.WriteLine("  компонент не найден ни у одной сущности — перепись невозможна.");
+            Console.WriteLine("  (проверьте RVA: он берётся из GameOffsets/ComponentVtables.cs и");
+            Console.WriteLine("   действителен только для той сборки клиента, на которой снят)");
+            return;
+        }
+
+        var kinds = comps.GroupBy(x => x.Kind).OrderByDescending(g => g.Count()).ToList();
+        Console.WriteLine($"  виды сущностей: " +
+                          string.Join(", ", kinds.Select(g => $"{g.Key}={g.Count()}")));
+        Console.WriteLine();
+
+        // Читаем окно каждого компонента ОДНИМ чтением: перепись идёт по всей зоне, и экономия
+        // на системных вызовах здесь же превращается в сокращение времени, за которое человек
+        // может сменить зону под нами.
+        var windows = comps.Select(c => Raw(c.Comp, bytes)).ToList();
+
+        Console.WriteLine("БАЙТОВЫЕ ПОЛЯ: какие смещения СТРОГО БУЛЕВЫ по всей популяции и при этом не постоянны");
+        Console.WriteLine(new string('-', 100));
+        Console.WriteLine("  Постоянное поле бесполезно как признак, даже если оно булево: оно ничего не");
+        Console.WriteLine("  различает. Полезно то, что булево И меняется, И меняется ПО ВИДУ сущности.");
+        Console.WriteLine();
+        Console.WriteLine("  смещ.  значения        доля 1   разбивка по видам (вид: доля единиц из числа)");
+
+        var printed = 0;
+
+        for (var off = 0; off < bytes; off++)
+        {
+            var values = new HashSet<int>();
+            foreach (var win in windows) values.Add(win[off]);
+            if (values.Count < 2) continue;                    // постоянное — не различает ничего
+            if (values.Any(v => v > 1)) continue;              // не булево
+
+            var ones = windows.Count(win => win[off] == 1);
+            var byKind = new List<string>();
+            for (var k = 0; k < kinds.Count && k < 8; k++)
+            {
+                var g = kinds[k];
+                var idx = comps.Select((c, i) => (c, i)).Where(t => t.c.Kind == g.Key).Select(t => t.i).ToList();
+                var o = idx.Count(i => windows[i][off] == 1);
+                byKind.Add($"{g.Key}: {o}/{idx.Count}");
+            }
+
+            Console.WriteLine($"  +0x{off:X2}   0 и 1       {ones * 100.0 / comps.Count,5:F1}%   " +
+                              string.Join("  ", byKind));
+            printed++;
+        }
+
+        if (printed == 0)
+            Console.WriteLine("  НИ ОДНОГО: строго булевых и при этом непостоянных байт в окне нет.");
+
+        // Если булевых кандидатов несколько, сама по себе перепись их НЕ РАЗВОДИТ: она говорит
+        // «искомое поле здесь», но не какое из них какое. Разводят их СУЩНОСТИ, НА КОТОРЫХ ОНИ
+        // РАСХОДЯТСЯ, — поэтому они печатаются поимённо, с полным путём метаданных. Дальше вопрос
+        // решается смыслом («может ли ЭТО быть целью?»), а не ещё одним числом.
+        var boolOffsets = new List<int>();
+        for (var off = 0; off < bytes; off++)
+        {
+            var values = new HashSet<int>();
+            foreach (var win in windows) values.Add(win[off]);
+            if (values.Count >= 2 && values.All(v => v <= 1)) boolOffsets.Add(off);
+        }
+
+        if (boolOffsets.Count >= 2)
+        {
+            Console.WriteLine();
+            Console.WriteLine("ГДЕ КАНДИДАТЫ РАСХОДЯТСЯ — поимённо. Это и есть материал для решения");
+            Console.WriteLine(new string('-', 100));
+            Console.WriteLine("  " + string.Join("  ", boolOffsets.Select(o => $"+0x{o:X2}")) + "   путь метаданных");
+
+            var shown = 0;
+            for (var i = 0; i < comps.Count && shown < 40; i++)
+            {
+                var vals = boolOffsets.Select(o => windows[i][o]).ToList();
+                if (vals.Distinct().Count() < 2) continue;      // согласны между собой — не информативны
+
+                var det = Q(comps[i].Ent + EntDetails);
+                var path = "?";
+                if (IsPointer(det))
+                {
+                    var ptr = Q(det + DetPathPtr);
+                    var len = Q(det + DetPathLen);
+                    if (IsPointer(ptr) && len > 0 && len <= 512) path = ReadUtf16(ptr, (int)len) ?? "?";
+                }
+
+                Console.WriteLine("  " + string.Join("     ", vals.Select(v => v.ToString())) + "      " + path);
+                shown++;
+            }
+
+            if (shown == 0)
+                Console.WriteLine("  НИ ОДНОЙ: кандидаты согласны на всей популяции — значит это одно и то же поле,");
+            else
+                Console.WriteLine($"  расходятся на {shown} сущностях (показано не больше 40).");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"  строго булевых и непостоянных байт: {printed} из {bytes}");
+        Console.WriteLine();
+
+        // ── Малые целые: перечисления ───────────────────────────────────────────────────────────
+        // Булев признак — частный случай. Перечисление (редкость, реакция, состояние) выглядит
+        // иначе: небольшой набор значений, непостоянный, и РАСПРЕДЕЛЕНИЕ у него неравномерное —
+        // обычных монстров много, редких мало. Равномерность как раз подозрительна: у мусорного
+        // байта, случайно попавшего в узкий диапазон, нет причин быть скошенным.
+        Console.WriteLine("МАЛЫЕ ЦЕЛЫЕ: смещения, где значений немного (<= 8, все <= 15) и они не постоянны");
+        Console.WriteLine(new string('-', 100));
+        Console.WriteLine("  Так выглядит перечисление. Смотрите на ГИСТОГРАММУ: у настоящего признака она");
+        Console.WriteLine("  скошена (редкого мало), у случайно узкого мусора — нет причин быть скошенной.");
+        Console.WriteLine();
+        Console.WriteLine("  смещ.  гистограмма значений (значение x сколько)");
+
+        var enums = 0;
+
+        for (var off = 0; off < bytes; off++)
+        {
+            var hist = new SortedDictionary<int, int>();
+            foreach (var win in windows)
+            {
+                hist.TryGetValue(win[off], out var n);
+                hist[win[off]] = n + 1;
+            }
+
+            if (hist.Count < 2 || hist.Count > 8) continue;
+            if (hist.Keys.Any(v => v > 15)) continue;
+            if (hist.Keys.All(v => v <= 1)) continue;          // это булев, он уже напечатан выше
+
+            Console.WriteLine($"  +0x{off:X2}   " +
+                              string.Join("  ", hist.Select(kv => $"{kv.Key} x{kv.Value}")));
+            enums++;
+        }
+
+        if (enums == 0)
+            Console.WriteLine("  НИ ОДНОГО.");
+        Console.WriteLine();
+        Console.WriteLine($"  кандидатов-перечислений: {enums} из {bytes}");
+        Console.WriteLine();
+
+        // ── Векторы ─────────────────────────────────────────────────────────────────────────────
+        // StdVector — три указателя подряд (First, Last, End), и это ОЧЕНЬ узкий шаблон: требуется
+        // First <= Last <= End, все три либо нули, либо канонические указатели, и (Last - First)
+        // кратно 8. Случайные 24 байта этого почти никогда не выполняют, а по популяции — тем более.
+        // Полезен вектор не сам по себе, а как ЯКОРЬ: рядом с ним лежит то, что он описывает
+        // (например, редкость рядом с вектором модификаторов), и число элементов у него
+        // коррелирует с признаком, который ищут.
+        Console.WriteLine("ВЕКТОРЫ (First/Last/End): где в компоненте лежат векторы и сколько в них элементов");
+        Console.WriteLine(new string('-', 100));
+        Console.WriteLine("  смещ.  сошлось у   гистограмма числа элементов");
+
+        var vecs = 0;
+
+        for (var off = 0; off + 24 <= bytes; off += 8)
+        {
+            var ok = 0;
+            var counts = new SortedDictionary<long, int>();
+
+            foreach (var win in windows)
+            {
+                var f = BitConverter.ToInt64(win, off);
+                var l = BitConverter.ToInt64(win, off + 8);
+                var e = BitConverter.ToInt64(win, off + 16);
+
+                if (f == 0 && l == 0 && e == 0)
+                {
+                    ok++;
+                    counts.TryGetValue(0, out var z);
+                    counts[0] = z + 1;
+                    continue;
+                }
+
+                if (!IsPointer(f) || !IsPointer(l) || !IsPointer(e)) break;
+                if (l < f || e < l) break;
+                if ((l - f) % 8 != 0) break;
+                var n = (l - f) / 8;
+                if (n > 4096) break;
+
+                ok++;
+                counts.TryGetValue(n, out var c);
+                counts[n] = c + 1;
+            }
+
+            if (ok != windows.Count) continue;                  // шаблон обязан выполниться У ВСЕХ
+            if (counts.Count < 2) continue;                     // вектор одной и той же длины неинтересен
+
+            Console.WriteLine($"  +0x{off:X2}   {ok}/{windows.Count}      " +
+                              string.Join("  ", counts.Take(10).Select(kv => $"{kv.Key} x{kv.Value}")) +
+                              (counts.Count > 10 ? " …" : ""));
+            vecs++;
+        }
+
+        if (vecs == 0)
+            Console.WriteLine("  НИ ОДНОГО вектора переменной длины, выполняющего шаблон у ВСЕХ.");
+        Console.WriteLine();
+        Console.WriteLine($"  векторов переменной длины: {vecs}");
+        Console.WriteLine("  Чем их меньше, тем сильнее вывод: если такой байт один, он и есть искомый признак.");
+        Console.WriteLine();
+
+        // Постоянные байты печатаются отдельно и сжато: это карта «здесь поля нет», и именно она
+        // опровергает объявленные смещения, по которым лежит вечный ноль.
+        var constOffsets = new List<int>();
+        for (var off = 0; off < bytes; off++)
+        {
+            var v = windows[0][off];
+            if (windows.All(win => win[off] == v)) constOffsets.Add(off);
+        }
+
+        Console.WriteLine($"ПОСТОЯННЫЕ ПО ВСЕЙ ПОПУЛЯЦИИ БАЙТЫ: {constOffsets.Count} из {bytes}");
+        Console.WriteLine(new string('-', 100));
+        Console.WriteLine("  По такому смещению поле-признак лежать не может: оно одинаково у монстра, сундука");
+        Console.WriteLine("  и декорации. Смещение из этого списка, объявленное в структуре, — почти наверняка");
+        Console.WriteLine("  ошибка (ровно так выглядел бы прежний Targetable, если он читает не оттуда).");
+        Console.WriteLine("  " + string.Join(", ", constOffsets.Take(96).Select(o => $"0x{o:X2}={windows[0][o]}")) +
+                          (constOffsets.Count > 96 ? " …" : ""));
+    }
+
     private static List<long> WalkEntityList(long listAddress)
     {
         var result = new List<long>(1024);
