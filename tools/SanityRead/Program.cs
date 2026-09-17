@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Runtime.InteropServices;
 using ExileCore;
 using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.Components;
@@ -711,8 +712,147 @@ internal static class Program
 
         PrintNearestEntities(data, player, addresses);
 
+        // ── Шаг 7. Камера ────────────────────────────────────────────────────────────────────────
+        //
+        // Единственный раздел, который проверяет СОДЕРЖИМОЕ поля, а не диапазон числа. Остальные
+        // проверки этого инструмента нули проходят: «позиция в сетке (0,0)» была зелёной ровно до
+        // того дня, когда Positioned замерили. Здесь нулю пройти нечем — проекция обязана попасть
+        // в конкретную точку экрана, и мимо неё промахивается любая ложь о камере.
+        Head("7. КАМЕРА");
+
+        CheckCamera(ingameState, player, process);
+
         return _failed > 0 ? ExitGarbage : ExitPlausible;
     }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // Камера. Проверяется ТЕМ ЖЕ кодом, которым ей пользуется плагин: Camera.WorldToScreen, а не
+    // собственной арифметикой инструмента. Иначе проверялись бы числа, а не путь до них.
+    //
+    // Главный критерий — проекция позиции игрока. В PoE камера следует за персонажем, поэтому его
+    // экранный X обязан совпадать с горизонтальным ЦЕНТРОМ экрана в ЛЮБОЙ момент: стоит он, идёт
+    // или дерётся. Замер 2026-09-17 дал ровно центр (ошибка 0.0000 px), и тот же центр вышел
+    // 2026-09-16 в другой зоне при другой позиции — значит это инвариант, а не удача одной точки.
+    //
+    // Чем это ловит регресс. Прежние смещения давали Width = 0, отчего HalfWidth = 0 и
+    // WorldToScreen возвращал X = (cord.X + 1) * 0 — тождественный ноль для любой точки мира.
+    // Ноль проходит любую проверку диапазона и не прошёл бы эту: |0 - 1280| = 1280 px.
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    private static void CheckCamera(IngameState ingameState, Entity player, Process process)
+    {
+        var camera = ingameState == null ? null : Safe(() => ingameState.Camera, out _);
+
+        if (camera == null || !IsPointer(camera.Address))
+        {
+            Row("Camera.Address", Hex(camera?.Address ?? 0), "указатель 0x10000..0x7FFFFFFFFFFF", Verdict.Bad);
+            return;
+        }
+
+        Row("Camera.Address", Hex(camera.Address), "указатель 0x10000..0x7FFFFFFFFFFF", Verdict.Ok);
+
+        var width = SafeStruct(() => camera.Width, out var widthErr) ?? 0;
+        var height = SafeStruct(() => camera.Height, out _) ?? 0;
+
+        // Размер клиентской области у ОС — факт, известный ВНЕ памяти процесса, и потому годный
+        // в контроль. Если окна нет (свёрнуто, ещё не создано), проверка вырождается в диапазон,
+        // и это сказано в самой строке, а не спрятано за зелёным «ok».
+        var osWidth = 0;
+        var osHeight = 0;
+
+        try
+        {
+            if (process.MainWindowHandle != IntPtr.Zero && GetClientRect(process.MainWindowHandle, out var rc))
+            {
+                osWidth = rc.Right - rc.Left;
+                osHeight = rc.Bottom - rc.Top;
+            }
+        }
+        catch
+        {
+            // Диагностика не имеет права ронять вызывающего: окно могло исчезнуть между вызовами.
+        }
+
+        if (osWidth > 0 && osHeight > 0)
+            Row("размер экрана", widthErr ?? $"{width} x {height}",
+                $"{osWidth} x {osHeight} — столько же, сколько у окна игры по GetClientRect",
+                width == osWidth && height == osHeight ? Verdict.Ok : Verdict.Bad);
+        else
+            Row("размер экрана", widthErr ?? $"{width} x {height}",
+                "обе стороны 320..16000 (окно игры не опрошено, сверять не с чем)",
+                width >= 320 && width <= 16000 && height >= 320 && height <= 16000 ? Verdict.Ok : Verdict.Bad);
+
+        var zNear = SafeStruct(() => camera.ZNear, out _) ?? 0f;
+        var zFar = SafeStruct(() => camera.ZFar, out _) ?? 0f;
+
+        Row("плоскости отсечения", $"ближняя {zNear:F2}, дальняя {zFar:F2}",
+            "0 < ближняя < дальняя < 100000",
+            zNear > 0 && zFar > zNear && zFar < 100000 ? Verdict.Ok : Verdict.Bad);
+
+        var camPos = SafeStruct(() => camera.Position, out var camPosErr);
+
+        if (player == null || !IsPointer(player.Address))
+        {
+            Row("проекция позиции игрока", "игрок не прочитан", "экранный X равен центру экрана", Verdict.Skip);
+            return;
+        }
+
+        var worldPos = SafeStruct(() => player.Pos, out var posErr);
+
+        if (!worldPos.HasValue)
+        {
+            Row("проекция позиции игрока", $"ошибка: {posErr}", "экранный X равен центру экрана", Verdict.Skip);
+            return;
+        }
+
+        // Положение камеры проверяется ПОСЛЕ позиции игрока, потому что сверяется с ней: камера
+        // висит над персонажем, а не в другом конце зоны. Это слабый критерий (он ловит мусор,
+        // но не сдвиг на несколько единиц) — и назван слабым прямо в строке ожидания.
+        if (camPos.HasValue)
+        {
+            var d = camPos.Value - worldPos.Value;
+            var dist = (float) Math.Sqrt(d.X * d.X + d.Y * d.Y + d.Z * d.Z);
+            var finite = !float.IsNaN(dist) && !float.IsInfinity(dist);
+            Row("положение камеры", $"({camPos.Value.X:F1}, {camPos.Value.Y:F1}, {camPos.Value.Z:F1}), " +
+                                    $"до игрока {dist:F0}",
+                "конечные числа и до игрока < 5000 (слабый критерий: ловит мусор, не сдвиг)",
+                finite && dist < 5000f ? Verdict.Ok : Verdict.Bad);
+        }
+        else
+        {
+            Row("положение камеры", $"ошибка: {camPosErr}", "конечные числа", Verdict.Bad);
+        }
+
+        var screen = SafeStruct(() => camera.WorldToScreen(worldPos.Value), out var projErr);
+
+        if (!screen.HasValue)
+        {
+            Row("проекция позиции игрока", $"ошибка: {projErr}", "экранный X равен центру экрана", Verdict.Bad);
+            return;
+        }
+
+        var sx = screen.Value.X;
+        var sy = screen.Value.Y;
+        var centreX = width * 0.5f;
+
+        // Допуск 1% ширины, а не пиксель: персонаж в кадре смещается на доли пикселя от сглаживания
+        // камеры, а 1% (25 px при 2560) всё ещё в сотню раз меньше ошибки, которую даёт неверное
+        // смещение, — при Width = 0 промах был 1280 px, при чужой матрице сотни.
+        var tolerance = Math.Max(4f, width * 0.01f);
+        var onScreen = sy >= 0 && sy <= height && !float.IsNaN(sx) && !float.IsNaN(sy);
+
+        Row("проекция позиции игрока", $"({sx:F1}, {sy:F1})",
+            $"X в пределах {tolerance:F0} px от центра {centreX:F0}, Y на экране",
+            onScreen && Math.Abs(sx - centreX) <= tolerance ? Verdict.Ok : Verdict.Bad);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetClientRect(IntPtr handle, out Rect rect);
 
     // ── Сырой результат паттерн-скана ────────────────────────────────────────────────────────────
     //

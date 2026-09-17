@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    CamCap — атомарный снимок КАМЕРЫ живого клиента. Этим инструментом сняты числа, которыми
+    починена камера (docs/api/camera-measured.md).
+
+    ЗАЧЕМ ОТДЕЛЬНЫЙ ИНСТРУМЕНТ. Проверка гипотезы о раскладке камеры — это не чтение одного поля,
+    а согласованная арифметика: матрица вида-проекции, позиция игрока и размер экрана обязаны
+    сойтись В ОДНОМ кадре. Разными запусками так не померить: между двумя командами человек ходит,
+    камера едет, и матрица из первого запуска не соответствует позиции из второго. Здесь всё
+    чтение идёт в ОДНОМ процессе, окно камеры снимается ОДНИМ ReadProcessMemory, и снимок обрамлён
+    проверкой «зона, база Data и указатель на камеру не менялись» — иначе НЕДЕЙСТВИТЕЛЕН и код 3.
+
+    ТОЛЬКО ЧТЕНИЕ: процесс открывается с PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, ни одной
+    записи, ни ввода, ни инъекции.
+
+    НАМЕРЕННО БЕЗ ProjectReference, как и EntCap: инструмент обязан уметь читать гипотезу, которой
+    в коде ещё нет, и не должен ломаться от того, что GameOffsets меняется под ним. Все числа
+    объявлены здесь же константами с пометкой, откуда они.
+
+    НЕ входит в ExileApi.sln. Сборка и запуск:
+      dotnet build -c Release tools\CamCap\CamCap.csproj
+      tools\CamCap\bin\Release\net10.0-windows\CamCap.exe (ключ igs = адрес IngameState)
+    Адрес IngameState берётся у соседа:
+      tools\FindOffset\bin\Release\net10.0-windows\FindOffset.exe (ключ ingame-state)
+
+    net10.0-windows, а не net10.0 как у EntCap: нужен GetClientRect окна игры — размер экрана,
+    известный ВНЕ памяти, и потому годный в контроль.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Platforms>AnyCPU;x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ExileApi.Tools.CamCap</RootNamespace>
+    <AssemblyName>CamCap</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+</Project>

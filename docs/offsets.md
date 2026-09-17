@@ -1,4 +1,4 @@
-# GameOffsets
+﻿# GameOffsets
 
 The `GameOffsets` project (`GameOffsets.dll`) is a collection of plain C# structs that
 mirror the in-memory layout of Path of Exile's own data structures. It contains no game
@@ -67,6 +67,18 @@ offset from that object could reach it. The pointer to it sits at `IngameState +
 match in a `0x10000` window; the number it replaced (`0xF4C`, read as an embedded struct) landed in
 a text buffer. `ServerData` had the same shape of error and is described in
 `Core/PoEMemory/MemoryObjects/IngameState.cs`.
+
+That pointer leads to a struct which has now been re-measured in full. `CameraOffsets` was wrong in
+every field: `Width` was declared at `0x4`, where the object holds a zero, so `Camera.HalfWidth` was
+0 and `WorldToScreen` returned an identically-zero X for every point in the world - silently, with
+no exception and no log line. The measured values are `Width 0x318`, `Height 0x31C`,
+`MatrixBytes 0x1A8`, `Position 0x2E8`, `ZNear 0x308` (new) and `ZFar 0x30C`, and every one of them
+was FOUND by a criterion rather than confirmed against a guess: the viewport against the OS's own
+`GetClientRect`, the matrix against the projection of the player landing on the horizontal centre of
+the screen, the camera position by inverting that matrix and then searching memory for the result,
+and the two clip planes by deriving them from the same matrix. Details, including two offsets that
+remain ambiguous against a same-valued twin, are in [api/camera-measured.md](api/camera-measured.md);
+the tool is `tools/CamCap`.
 
 Note what the method does **not** establish. `tools/RefLive` runs the reference's own code against
 the same process, so all of this proves *this fork reads what the reference reads* - not *this is
@@ -304,6 +316,7 @@ a recompile.
   **have** been verified against a live build and say so with a count and a criterion -
   `IngameDataOffsets` and `TerrainData` (see [api/ingamedata-measured.md](api/ingamedata-measured.md)),
   the entity layer and the hot-path components (see
-  [api/entities-measured.md](api/entities-measured.md)). Everything not named in those two documents
+  [api/entities-measured.md](api/entities-measured.md)), and the camera (see
+  [api/camera-measured.md](api/camera-measured.md)). Everything not named in those documents
   is still carried over from the reference distribution and unverified here; the structs do not mark
   the difference, only their XML comments and these documents do.

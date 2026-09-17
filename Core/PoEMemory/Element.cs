@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using ExileCore.PoEMemory.Elements;
 using ExileCore.Shared.Cache;
@@ -217,6 +217,22 @@ public class Element : RemoteMemoryObject
         var vPos = GetParentPos();
         float width = TheGame.IngameState.Camera.Width;
         float height = TheGame.IngameState.Camera.Height;
+
+        // A zero viewport is not a rectangle of zero size, it is NO rectangle, and the difference
+        // matters because of what the arithmetic below does with it: width / 2560f is 0, ratioFixMult
+        // is 0 or NaN, and their quotient is NaN. The X and Width of the result come out NaN while Y
+        // and Height come out FINITE garbage, so callers that screen their input with IsFinite let it
+        // through, and callers that screen it with `rect.Width <= 0` let it through too -- NaN
+        // compares false against every bound, so every such guard silently passes. That is how a
+        // broken camera turns into a click at (0, 0) rather than into a skipped click.
+        //
+        // This is not hypothetical and it is not fixed by measuring the offsets, which is why the
+        // guard is here and not in the caller. Camera is reached through GetObject, which never
+        // returns null -- it returns an object whose Address is 0 -- and Memory.Read on address 0
+        // returns an all-zero struct rather than throwing. So on the login screen, during a zone
+        // transition, and after any pointer failure, Width is 0 with perfectly correct offsets.
+        if (!(width > 0f) || !(height > 0f)) return RectangleF.Empty;
+
         var ratioFixMult = width / height / 1.6f;
         var xScale = width / 2560f / ratioFixMult;
         var yScale = height / 1600f;

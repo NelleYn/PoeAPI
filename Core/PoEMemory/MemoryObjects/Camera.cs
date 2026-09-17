@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using ExileCore.Shared.Cache;
 using GameOffsets;
 using SharpDX;
@@ -8,26 +8,27 @@ namespace ExileCore.PoEMemory.MemoryObjects
     public class Camera : RemoteMemoryObject
     {
         private static Vector2 oldplayerCord;
-        private readonly CameraOffsets? _cameraOffsets;
         private readonly CachedValue<CameraOffsets> _cachedValue;
 
         public Camera()
         {
             _cachedValue = new FrameCache<CameraOffsets>(() => M.Read<CameraOffsets>(Address));
-
-            _cachedValue.OnUpdate += offsets =>
-            {
-                HalfHeight = offsets.Height * 0.5f;
-                HalfWidth = offsets.Width * 0.5f;
-            };
         }
 
         public CameraOffsets CameraOffsets => _cachedValue.Value;
         public int Width => CameraOffsets.Width;
         public int Height => CameraOffsets.Height;
-        private float HalfWidth { get; set; }
-        private float HalfHeight { get; set; }
+
+        // Derived at the point of use, NOT pushed in by the cache's OnUpdate event. The event form
+        // was a silent-zero waiting to happen: it leaves the two halves at 0 until the cache first
+        // refreshes, and CachedValue.Value has a branch that returns a freshly computed value
+        // WITHOUT firing OnUpdate at all. A zero here produces exactly the failure this camera was
+        // just repaired from -- WorldToScreen returning the same point for every input, quietly.
+        private float HalfWidth => CameraOffsets.Width * 0.5f;
+        private float HalfHeight => CameraOffsets.Height * 0.5f;
+
         public Vector2 Size => new Vector2(Width, Height);
+        public float ZNear => CameraOffsets.ZNear;
         public float ZFar => CameraOffsets.ZFar;
         public Vector3 Position => CameraOffsets.Position;
         public string PositionString => Position.ToString();
