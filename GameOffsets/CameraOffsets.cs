@@ -45,13 +45,22 @@ namespace GameOffsets;
 /// (4) the clip W of the player lies between the near and far planes derived from that same block.
 /// </para>
 /// <para>
-/// UNRESOLVED, AND DELIBERATELY RECORDED AS SUCH. The client keeps TWO byte-identical copies of
-/// the matrix, at 0x1A8 and 0x1E8. While the character stands still they cannot be told apart —
-/// 807 consecutive polls found zero differing bytes. Telling them apart requires the character to
-/// WALK during the measurement (<c>CamCap.exe --igs &lt;address&gt; --watch 25</c>), which had not
-/// been done when this was written. 0x1A8 is used because it is the first copy; if the walking
-/// control ever shows 0x1E8 tracking the current frame more closely, this is the field to change
-/// and nothing else.
+/// THE TWO COPIES ARE INTERCHANGEABLE — settled by measurement, not assumed. The client keeps two
+/// copies of the matrix, at 0x1A8 and 0x1E8. The walking control was run
+/// (<c>CamCap.exe --igs &lt;address&gt; --watch</c>) with the character moving at up to 97 world
+/// units per frame: across ~1600 frame-checked samples, 443 of them in motion, the two blocks were
+/// byte-identical in every one. In an earlier run where they did differ in low-order bits, their
+/// projections of the same point agreed to 0.001 px over 830 moving samples. Either copy may be
+/// read; 0x1A8 is kept.
+/// </para>
+/// <para>
+/// WHAT THE WALKING CONTROL ALSO SHOWED, and it matters more than the copy question: the PoE camera
+/// EASES after the character rather than tracking him rigidly. Standing still he projects to the
+/// exact horizontal centre (error 0.000 px). Running, the median error is still 0.000 px and the
+/// 95th percentile 0.001 px, but the worst excursions reach 4.8% and 5.1% of screen width in two
+/// separate runs. Any check on this projection has to allow for that: the gate in
+/// <c>tools/SanityRead</c> uses 15% of width, which clears the measured excursion threefold and
+/// still catches a broken camera by more than threefold (Width = 0 misses by half the width).
 /// </para>
 /// </remarks>
 [StructLayout(LayoutKind.Explicit, Pack = 1)]
@@ -63,15 +72,14 @@ public struct CameraOffsets
     /// <c>GetClientRect</c> — a fact known OUTSIDE the process memory. Was 0x4, where a zero sits.
     /// </summary>
     /// <remarks>
-    /// NOT THE ONLY SUCH PAIR, and the first write-up of this measurement wrongly said it was. That
-    /// run searched a 0x400 window; a second pair holding the same 2560x1440 sits at 0x498/0x49C. A
-    /// short window did not refute the twin, it failed to SEE it. By value the two are
-    /// indistinguishable, so 0x318 is chosen only because it comes first — a weak reason, recorded
-    /// as weak. What would settle it is one cheap action: change the game's resolution or window
-    /// size and re-run <c>tools/CamCap</c>; whichever pair follows the window is the one the
-    /// renderer reads, and if both follow, the choice does not matter. Until then the exposure is
-    /// bounded to the moment the two copies disagree — a resolution change — because in a settled
-    /// state they are equal, which <c>tools/SanityRead</c> re-checks on every run.
+    /// NOT THE ONLY SUCH PAIR, and the first write-up of this measurement wrongly said it was — that
+    /// run searched a 0x400 window, and a second pair holding the same values sits at 0x498/0x49C.
+    /// A short window did not refute the twin, it failed to SEE it. The twin has since been resolved
+    /// the only way it could be: the game window was resized and the measurement repeated. BOTH
+    /// pairs followed it, through three different client areas — 2560x1440, 2544x1353 and 1278x958 —
+    /// across two client launches. They are interchangeable, and 0x318 is kept. That sequence also
+    /// makes this the best-repeated number in the struct: three viewport sizes and a client restart,
+    /// checked against the OS's own GetClientRect every time.
     /// </remarks>
     [FieldOffset(0x318)] public int Width;
 
@@ -97,6 +105,14 @@ public struct CameraOffsets
     /// the matrix and read 0.0.
     /// </summary>
     /// <remarks>
+    /// NEITHER PLANE IS A CONSTANT, and confirming that is what makes these two offsets solid. In a
+    /// second camera state (viewport 1278x958) the same derivation gave k = 1.045492, d = -78.412,
+    /// hence near 75.000 and far 1723.632 — and those values, not the earlier 176.25 and 3100, were
+    /// the ones sitting at 0x308 and 0x30C. The derivation landed on the same two offsets with
+    /// completely different numbers, so what is confirmed is the working relation matrix -> planes,
+    /// not a coincidence between two constants. A wrong offset does not hit twice that way.
+    /// </remarks>
+    /// <remarks>
     /// DERIVED, NOT COPIED, and the reference is the reason that distinction is not pedantic: its
     /// own ZFar reads 0.5886619 on this client, a value that occurs four times in the camera window
     /// and is in every case the M12 or M22 element of a DIFFERENT matrix block (the view matrices
@@ -119,12 +135,11 @@ public struct CameraOffsets
     /// the tail of its own matrix. Was 0xD4.
     /// </summary>
     /// <remarks>
-    /// A SECOND COPY of the computed triple sits at 0x420, and by value the two cannot be told
-    /// apart. 0x2E8 is chosen as the first. What would settle it is <c>CamCap --watch</c> while the
-    /// character WALKS: if the copies refresh at different times, the walking run separates them.
-    /// Nothing in the engine reads this field today (an exhaustive grep over Core/ and Loader/
-    /// finds no consumer of Camera.Position at all; only the plugin's diagnostic probe reads it),
-    /// so the cost of picking wrong is currently confined to that probe.
+    /// A SECOND COPY of the computed triple sits at 0x420. The walking control did not separate them
+    /// either — they held the same value in every frame-checked sample, moving and still — so like
+    /// the two matrix copies they are interchangeable, and 0x2E8 is kept. Nothing in the engine
+    /// reads this field today (an exhaustive grep over Core/ and Loader/ finds no consumer of
+    /// Camera.Position at all; only the plugin's diagnostic probe reads it).
     /// </remarks>
     [FieldOffset(0x2E8)] public Vector3 Position;
 

@@ -381,101 +381,214 @@ internal static class Program
     {
         Console.WriteLine($"НАБЛЮДЕНИЕ {seconds} с — ХОДИТЕ, пока идёт замер. В покое копии матрицы неразличимы.");
         Console.WriteLine(new string('-', 100));
+        Console.WriteLine("  КАЖДЫЙ ОТСЧЁТ ОБРАМЛЁН ОТДЕЛЬНО. Позиция игрока читается ДО и ПОСЛЕ окна камеры, и");
+        Console.WriteLine("  отсчёт засчитывается, только если она не изменилась между двумя чтениями. Без этой");
+        Console.WriteLine("  рамки замер бессмыслен: при шаге 190 единиц за кадр перекос в доли кадра между");
+        Console.WriteLine("  чтением матрицы и чтением позиции даёт сотни пикселей «ошибки» на ЛЮБОЙ матрице.");
+        Console.WriteLine();
 
         var data = Q(igs + IgsData);
-        var win = Raw(camera, len);
-
-        // Смещения матриц ищутся ОДИН раз, на первом кадре, тем же критерием центра.
-        var player0 = FindPlayerPos(data, out var pa0, out _, out _);
-        if (pa0 == 0)
-        {
-            Console.WriteLine("  LocalPlayer не прочитан.");
-            return ExitNothingToRead;
-        }
-
         var halfW = osW * 0.5;
         var halfH = osH * 0.5;
+
+        // Кандидаты отбираются по СТРУКТУРЕ (столбец Z пропорционален столбцу W), а не по тому,
+        // попал ли блок в центр на первом кадре. Прежняя версия делала именно это — и на движущемся
+        // персонаже отбрасывала отстающую копию ДО того, как её успевали сравнить с ведущей, то есть
+        // предрешала ровно тот вопрос, ради которого запускается наблюдение.
+        var win0 = Raw(camera, len);
         var candidates = new List<int>();
         for (var off = 0; off + 64 <= len; off += 4)
         {
-            var m = ReadMatrix(win, off);
+            var m = ReadMatrix(win0, off);
             if (m == null) continue;
-            if (!Project(m, player0, halfW, halfH, out var sx, out var sy, out var cw)) continue;
-            if (cw <= 1.0 || Math.Abs(sx - halfW) > 2.0) continue;
-            if (sy < -0.5 * halfH || sy > 2.5 * halfH) continue;
-            if (!Planes(m, out var n, out var f, out _, out _)) continue;   // та же конъюнкция, что в снимке
-            if (cw <= n || cw >= f) continue;
+            if (!Planes(m, out var n, out var f, out _, out _)) continue;
+            if (n < 1 || f > 1e5 || f <= n) continue;
+            if (!CameraCentre(m, out var qx, out var qy, out var qz)) continue;
+            if (Math.Abs(qx) > 1e6 || Math.Abs(qy) > 1e6 || Math.Abs(qz) > 1e6) continue;
             candidates.Add(off);
         }
 
         if (candidates.Count == 0)
         {
-            Console.WriteLine("  на первом кадре критерий центра не сошёлся.");
+            Console.WriteLine("  ни один блок окна не имеет структуры матрицы вида-проекции.");
             return ExitNoCriterion;
         }
 
-        Console.WriteLine($"  кандидатов-матриц: {string.Join(", ", candidates.Select(o => $"+0x{o:X3}"))}");
+        Console.WriteLine($"  кандидатов по СТРУКТУРЕ: {string.Join(", ", candidates.Select(o => $"+0x{o:X3}"))}");
         Console.WriteLine();
 
-        var worst = candidates.ToDictionary(o => o, _ => 0.0);
+        var errAll = candidates.ToDictionary(o => o, _ => new List<double>());
+        var errMoving = candidates.ToDictionary(o => o, _ => new List<double>());
         var worstAt = candidates.ToDictionary(o => o, _ => "");
+        var worstErr = candidates.ToDictionary(o => o, _ => -1.0);
+        var polls = 0;
+        var kept = 0;
+        var skewed = 0;
+        var movingKept = 0;
         var differed = 0;
-        var moved = 0;
-        var samples = 0;
         var maxStep = 0.0;
-        var prev = player0;
+        var prev = default(Vec3);
+        var havePrev = false;
 
+        var diffs = new List<double>();
         var sw = Stopwatch.StartNew();
         while (sw.Elapsed.TotalSeconds < seconds)
         {
-            Thread.Sleep(16);
-            var w2 = Raw(camera, len);
-            var p = FindPlayerPos(data, out var pa, out _, out _);
-            if (pa == 0) continue;
-            samples++;
+            // ~200 Гц. Без паузы опрос идёт на 30 кГц, и тогда «сместился с прошлого отсчёта»
+            // означает «за 33 мкс», то есть почти никогда: признак движения вырождается.
+            Thread.Sleep(4);
+            polls++;
 
-            var step = Math.Sqrt((p.X - prev.X) * (p.X - prev.X) + (p.Y - prev.Y) * (p.Y - prev.Y));
-            if (step > 1.0) moved++;
+            // ── Рамка отсчёта: позиция ДО, окно, позиция ПОСЛЕ ───────────────────────────────────
+            var p1 = FindPlayerPos(data, out var pa1, out _, out _);
+            if (pa1 == 0) continue;
+            var win = Raw(camera, len);
+            var p2 = FindPlayerPos(data, out var pa2, out _, out _);
+            if (pa2 != pa1) continue;
+
+            if (p1.X != p2.X || p1.Y != p2.Y || p1.Z != p2.Z)
+            {
+                skewed++;
+                continue;
+            }
+
+            kept++;
+
+            var step = havePrev
+                ? Math.Sqrt((p1.X - prev.X) * (p1.X - prev.X) + (p1.Y - prev.Y) * (p1.Y - prev.Y))
+                : 0.0;
+            var moving = havePrev && step > 1.0;
+            if (moving) movingKept++;
             if (step > maxStep) maxStep = step;
-            prev = p;
+            prev = p1;
+            havePrev = true;
 
             if (candidates.Count > 1 &&
-                !Enumerable.Range(0, 64).All(k => w2[candidates[0] + k] == w2[candidates[1] + k]))
+                !Enumerable.Range(0, 64).All(k => win[candidates[0] + k] == win[candidates[1] + k]))
                 differed++;
+
+            var projected = new Dictionary<int, double>();
 
             foreach (var off in candidates)
             {
-                var m = ReadMatrix(w2, off);
+                var m = ReadMatrix(win, off);
                 if (m == null) continue;
-                if (!Project(m, p, halfW, halfH, out var sx, out var sy, out var cw) || cw <= 1.0) continue;
+                if (!Project(m, p1, halfW, halfH, out var sx, out var sy, out var cw) || cw <= 1.0) continue;
+                projected[off] = sx;
                 var err = Math.Abs(sx - halfW);
-                if (err > worst[off])
+                errAll[off].Add(err);
+
+                // Худший отсчёт и его число обновляются ОДНОЙ операцией, и в строку печатается сама
+                // ошибка. Прежняя форма считалась верно, но НЕ ПЕЧАТАЛА число: в выводе стояла
+                // проекция (574.4) рядом с максимумом (64.6), и они кажутся несовместимыми, пока не
+                // вспомнишь, что центр экрана в том прогоне был 639, а не 1272 — окно игры меняли
+                // между прогонами. Час ушёл на поиск несуществующей ошибки в коде. Печатать число
+                // рядом со свидетельством дешевле, чем восстанавливать его по памяти.
+                if (err > worstErr[off])
                 {
-                    worst[off] = err;
-                    worstAt[off] = $"игрок ({p.X:F1}, {p.Y:F1}, {p.Z:F1}) -> экран ({sx:F1}, {sy:F1})";
+                    worstErr[off] = err;
+                    worstAt[off] = $"игрок ({p1.X:F1}, {p1.Y:F1}) -> экран ({sx:F1}, {sy:F1}), " +
+                                   $"ошибка {err:F3} px, {(moving ? "в движении" : "в покое")}";
                 }
+
+                if (moving) errMoving[off].Add(err);
             }
+
+            // ПРЯМОЕ сравнение копий между собой, а не каждой с центром. Сравнение с центром их не
+            // разводит: обе отстают от персонажа ОДИНАКОВО, потому что отстаёт сама камера, и
+            // разность их медиан тонет в этом общем отставании.
+            if (candidates.Count > 1 &&
+                projected.TryGetValue(candidates[0], out var xa) &&
+                projected.TryGetValue(candidates[1], out var xb))
+                diffs.Add(Math.Abs(xa - xb));
         }
 
-        Console.WriteLine($"  кадров опрошено {samples}; из них со смещением игрока > 1 ед. мира: {moved}; " +
-                          $"наибольший шаг {maxStep:F1}");
+        Console.WriteLine($"  опросов {polls}; засчитано (позиция не менялась вокруг чтения окна) {kept}; " +
+                          $"отброшено по перекосу {skewed}");
+        Console.WriteLine($"  из засчитанных В ДВИЖЕНИИ: {movingKept}; наибольший шаг {maxStep:F1} ед. мира");
         if (candidates.Count > 1)
-            Console.WriteLine($"  кадров, где копии матрицы РАЗЛИЧАЛИСЬ: {differed} из {samples}");
+            Console.WriteLine($"  отсчётов, где первые две копии РАЗЛИЧАЛИСЬ побайтно: {differed} из {kept}");
         Console.WriteLine();
-        Console.WriteLine("  смещение   наибольшая |X - центр| за наблюдение   на чём достигнута");
-        foreach (var off in candidates.OrderBy(o => worst[o]))
-            Console.WriteLine($"  +0x{off:X3}      {worst[off],12:F3} px                  {worstAt[off]}");
+
+        Console.WriteLine("  ошибка |X - центр| в пикселях. ГЛАВНЫЙ СТОЛБЕЦ — «в движении».");
+        Console.WriteLine("  ВНИМАНИЕ: ненулевая ошибка в движении — это НЕ погрешность замера, а СВОЙСТВО ИГРЫ.");
+        Console.WriteLine("  Камера PoE следует за персонажем со сглаживанием, поэтому на бегу персонаж");
+        Console.WriteLine("  действительно не в центре экрана. Гейт обязан это учитывать, иначе он краснеет");
+        Console.WriteLine("  на исправной камере просто оттого, что игрок шёл.");
+        Console.WriteLine();
+        Console.WriteLine("  смещение   в движении: n   медиана     95-й проц.    макс   |   все: n   99-й проц.   макс");
+        foreach (var off in candidates.OrderBy(o => Med(errMoving[o])))
+            Console.WriteLine($"  +0x{off:X3}   {errMoving[off].Count,13}  {Med(errMoving[off]),8:F3}  " +
+                              $"{Pct(errMoving[off], 0.95),11:F3}  {Max(errMoving[off]),7:F3}   |  " +
+                              $"{errAll[off].Count,6}  {Pct(errAll[off], 0.99),9:F3}  {Max(errAll[off]),7:F3}");
+        Console.WriteLine();
+        Console.WriteLine("  Столбец «все» — это то, на чём НАДО строить порог гейта: гейт запускают когда угодно,");
+        Console.WriteLine("  в том числе на бегу, и он обязан не краснеть на исправной камере.");
 
         Console.WriteLine();
-        if (moved == 0)
+        foreach (var off in candidates)
+            if (worstAt[off].Length > 0)
+                Console.WriteLine($"  худший отсчёт +0x{off:X3}: {worstAt[off]}");
+
+        Console.WriteLine();
+        if (movingKept == 0)
+        {
             Console.WriteLine("  ПЕРСОНАЖ НЕ ДВИГАЛСЯ: этот прогон копии матрицы НЕ РАЗВОДИТ. Повторить, ходя.");
-        else if (differed == 0 && candidates.Count > 1)
-            Console.WriteLine("  копии ни разу не разошлись, хотя персонаж двигался — значит это одно и то же " +
-                              "значение, и выбор между ними безразличен.");
-        else
-            Console.WriteLine("  выбирать ту, у которой наибольшая ошибка меньше: она соответствует ТЕКУЩЕМУ кадру.");
+            return ExitOk;
+        }
 
+        if (candidates.Count > 1 && diffs.Count > 0)
+        {
+            Console.WriteLine($"  ПРЯМАЯ РАЗНОСТЬ ПРОЕКЦИЙ +0x{candidates[0]:X3} против +0x{candidates[1]:X3} " +
+                              $"по всем {diffs.Count} отсчётам:");
+            Console.WriteLine($"    медиана {Med(diffs):F4} px,  95-й проц. {Pct(diffs, 0.95):F4} px,  " +
+                              $"макс {Max(diffs):F4} px");
+            Console.WriteLine();
+        }
+
+        if (candidates.Count > 1 && differed == 0)
+        {
+            Console.WriteLine("  копии ни разу не разошлись побайтно, хотя персонаж двигался — значит это");
+            Console.WriteLine("  одно и то же значение, и выбор между ними безразличен.");
+            return ExitOk;
+        }
+
+        var ordered = candidates.OrderBy(o => Med(errMoving[o])).ToList();
+        var spread = Med(errMoving[ordered[ordered.Count - 1]]) - Med(errMoving[ordered[0]]);
+        var lag = Med(errMoving[ordered[0]]);
+
+        // Победитель объявляется, только если разрыв между копиями ВЕЛИК ПО СРАВНЕНИЮ с тем общим
+        // отставанием, которое есть у всех. Иначе «наименьшая медиана» — это шум в четвёртом знаке,
+        // и назвать его выводом значило бы выдать округление за измерение.
+        if (candidates.Count > 1 && spread < 0.1 * Math.Max(1.0, lag))
+        {
+            Console.WriteLine($"  ВЫВОД: копии НЕ РАЗЛИЧИМЫ этим замером. Медианы ошибки в движении отличаются");
+            Console.WriteLine($"  на {spread:F4} px при общем отставании камеры {lag:F1} px — это шум, а не разница.");
+            Console.WriteLine("  Выбор между ними безразличен для проекции; брать любую.");
+            return ExitOk;
+        }
+
+        Console.WriteLine($"  ВЫВОД: наименьшая медиана ошибки в движении у +0x{ordered[0]:X3}, и разрыв");
+        Console.WriteLine($"  ({spread:F3} px) велик по сравнению с общим отставанием ({lag:F1} px).");
+        Console.WriteLine("  Это матрица ТЕКУЩЕГО кадра; остальные копии запоздали.");
         return ExitOk;
+    }
+
+    private static double Med(List<double> xs)
+    {
+        if (xs.Count == 0) return double.NaN;
+        var s = xs.OrderBy(x => x).ToList();
+        return s.Count % 2 == 1 ? s[s.Count / 2] : (s[s.Count / 2 - 1] + s[s.Count / 2]) * 0.5;
+    }
+
+    private static double Max(List<double> xs) => xs.Count == 0 ? double.NaN : xs.Max();
+
+    private static double Pct(List<double> xs, double q)
+    {
+        if (xs.Count == 0) return double.NaN;
+        var s = xs.OrderBy(x => x).ToList();
+        var i = (int) Math.Min(s.Count - 1, Math.Max(0, Math.Round(q * (s.Count - 1))));
+        return s[i];
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
